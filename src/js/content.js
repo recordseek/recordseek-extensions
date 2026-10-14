@@ -46,12 +46,6 @@ function open_tab(newData) {
   app.newTab(url);
 }
 
-// The /share/ page (recordseek-app share-params.ts) currently only understands
-// _, url, h1, title, citation, notes, tags, e, ev. Any other param is folded
-// onto the captured source url, so person params are OFF until the app
-// consumes them. Flip to true once it does.
-var SEND_PERSON_PARAMS = false;
-
 function gx_short(type) {
   return type ? String(type).split('http://gedcomx.org/')[1] || String(type) : '';
 }
@@ -172,11 +166,9 @@ function RecordSeek() {
         }
       }
       newData['tags'] = newData['tags'].join();
-      if (SEND_PERSON_PARAMS) {
-        for (var key in person) {
-          if (person.hasOwnProperty(key) && person[key]) {
-            newData[key] = person[key];
-          }
+      for (var key in person) {
+        if (person.hasOwnProperty(key) && person[key]) {
+          newData[key] = person[key];
         }
       }
     } catch (err) {
