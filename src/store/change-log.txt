@@ -1,4 +1,12 @@
-﻿+---------+
++---------+
+| 2.6.0   |
++---------+
+
+* Rebuilt every package as a Manifest V3 extension so it can go back in the stores.
+* Safari is a Web Extension. Its share window is 700px wide so the FamilySearch and Ancestry actions stay visible on current macOS.
+* Added Brave, Arc, Naver Whale, Samsung Internet, Orion, and Chromium packages. Vivaldi and Yandex now build the RecordSeek extension instead of the old sidecar stub.
+
++---------+
 | 1.0.0.0 |
 +---------+
 

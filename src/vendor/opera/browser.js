@@ -1,30 +1,22 @@
-﻿browser = (function () {
-    if (typeof msBrowser !== "undefined")
-        return msBrowser;
-    if (typeof browser !== "undefined")
-        return browser;
-    return chrome;
-})();
+(function (root) {
+  var api = root.browser || root.chrome;
+  var app = root.app = root.app || {};
 
-(function (window) {
-    var app = window.app = window.app || {};
+  app.browser = {
+    name: "opera"
+  };
 
-    // Browser-Specific Implementations
+  app.newTab = function (url) {
+    api.runtime.sendMessage({
+      action: "newTab",
+      url: url,
+      browser: app.browser.name,
+      screenWidth: root.screen ? root.screen.width : 0,
+      screenHeight: root.screen ? root.screen.height : 0
+    });
+  };
 
-    app.browser = {
-        name: "opera"
-    };
-
-    app.newTab = function ($url) {
-        browser.runtime.sendMessage({action: "newTab", url: $url, 'browser': app.browser.name});
-    };
-
-    app.getVersion = function () {
-        return browser.runtime.getManifest()['version'];
-    }
-
-    // Browser-Unique Functionality
-
-    /* None */
-
-})(window);
+  app.getVersion = function () {
+    return api.runtime.getManifest().version;
+  };
+})(typeof globalThis !== "undefined" ? globalThis : window);

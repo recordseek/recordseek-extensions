@@ -1,33 +1,68 @@
 {
-    "manifest_version": 2,
-    "name": "{{name-full}}",
-    "short_name": "{{name-short}}",
-    "description": "{{description}}",
+    "manifest_version": 3,
+    "name": "__MSG_extName__",
+    "description": "__MSG_extDescription__",
     "author": "{{author}}",
     "version": "{{version}}",
+    "homepage_url": "https://recordseek.com",
+    "default_locale": "en",
     "icons": {
         "16": "img/icon-16.png",
         "32": "img/icon-32.png",
         "48": "img/icon-48.png",
         "128": "img/icon-128.png"
     },
-    "permissions": [ "tabs", "http://*/*", "https://*/*" ],
-    "browser_action": {
+    "action": {
         "default_icon": {
-            "19": "img/icon-19.png",
-            "38": "img/icon-38.png"
+            "16": "img/icon-16.png",
+            "32": "img/icon-32.png",
+            "48": "img/icon-48.png",
+            "128": "img/icon-128.png"
         },
-        "default_title": "{{name-full}}"
+        "default_title": "__MSG_menuAction__"
     },
     "background": {
-        "scripts": [ "js/background.js" ]
+        "scripts": [
+            "js/background.js"
+        ],
+        "service_worker": "js/background.js"
+    },
+    "permissions": [
+        "tabs",
+        "contextMenus",
+        "cookies",
+        "storage",
+        "scripting"
+    ],
+    "host_permissions": [
+        "http://*/*",
+        "https://*/*"
+    ],
+    "options_ui": {
+        "page": "html/options.html"
     },
     "content_scripts": [
         {
-            "matches": [ "http://*/*", "https://*/*" ],
-            "css": [ "css/browser-sidecar.css" ],
-            "js": [ "js/browser-sidecar.js", "js/browser-sidecar-vendor.js", "lib/jquery.min.js", "lib/jquery-ui.min.js" ]
+            "matches": [
+                "http://*/*",
+                "https://*/*"
+            ],
+            "js": [
+                "js/browser.js",
+                "lib/genscrape.min.js",
+                "js/content.js"
+            ]
         }
     ],
-    "web_accessible_resources": [ "img/*.*", "js/*.*", "css/*.*", "html/*.*" ]
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "js/*"
+            ],
+            "matches": [
+                "http://*/*",
+                "https://*/*"
+            ]
+        }
+    ]
 }

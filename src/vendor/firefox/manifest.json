@@ -1,41 +1,80 @@
-﻿{
-    "manifest_version": 2,
-    "applications": {
-        "gecko": {
-            "id": "{{vendor.firefox.package-id}}",
-            "strict_min_version": "45.0"
-        }
-    },
+{
+    "manifest_version": 3,
     "name": "__MSG_extName__",
     "description": "__MSG_extDescription__",
+    "author": "{{author}}",
     "version": "{{version}}",
+    "homepage_url": "https://recordseek.com",
     "default_locale": "en",
     "icons": {
+        "16": "img/icon-16.png",
+        "32": "img/icon-32.png",
         "48": "img/icon-48.png",
-        "96": "img/icon-96.png"
+        "128": "img/icon-128.png"
     },
-    "permissions": [ "tabs", "contextMenus", "http://*/*", "https://*/*", "cookies", "storage" ],
-    "browser_action": {
+    "action": {
         "default_icon": {
-            "18": "img/icon-18.png",
+            "16": "img/icon-16.png",
             "32": "img/icon-32.png",
-            "36": "img/icon-36.png",
-            "64": "img/icon-64.png"
+            "48": "img/icon-48.png",
+            "128": "img/icon-128.png"
         },
         "default_title": "__MSG_menuAction__"
     },
     "background": {
-        "scripts": [ "js/background.js" ]
+        "scripts": [
+            "js/background.js"
+        ],
+        "service_worker": "js/background.js"
     },
+    "permissions": [
+        "tabs",
+        "contextMenus",
+        "cookies",
+        "storage",
+        "scripting"
+    ],
+    "host_permissions": [
+        "http://*/*",
+        "https://*/*"
+    ],
     "options_ui": {
         "page": "html/options.html"
     },
     "content_scripts": [
         {
-            "matches": [ "http://*/*", "https://*/*" ],
-            "css": [],
-            "js": [ "js/browser.js", "lib/genscrape.min.js", "js/content.js" ]
+            "matches": [
+                "http://*/*",
+                "https://*/*"
+            ],
+            "js": [
+                "js/browser.js",
+                "lib/genscrape.min.js",
+                "js/content.js"
+            ]
         }
     ],
-    "web_accessible_resources": [ "js/*.*" ]
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "js/*"
+            ],
+            "matches": [
+                "http://*/*",
+                "https://*/*"
+            ]
+        }
+    ],
+    "browser_specific_settings": {
+        "gecko": {
+            "id": "{32b94c2d-1841-496e-9084-da37f3cd2664}",
+            "strict_min_version": "121.0",
+            "data_collection_permissions": {
+                "required": [
+                    "websiteContent"
+                ]
+            }
+        },
+        "gecko_android": {}
+    }
 }

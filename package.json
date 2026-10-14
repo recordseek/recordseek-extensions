@@ -1,10 +1,10 @@
 {
-    "name": "ironmanrust.browser-sidecar",
-    "version": "1.0.0",
-    "description": "A cross-platform, cross-browser extension that adds a 'sidecar' of content to any webpage you visit, suitable for an Evernote-like web clipper as well as many other uses.",
-    "main": "index.js",
+    "name": "recordseek-browser-extensions",
+    "version": "2.6.0",
+    "description": "RecordSeek browser extensions. Turn the page you are on into a source citation.",
     "scripts": {
-        "test": "echo \"Error: no test specified\" && exit 1"
+        "build": "node scripts/build.js",
+        "test": "node scripts/build.js"
     },
     "author": "IronManRust",
     "license": "ISC",
