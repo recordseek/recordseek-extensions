@@ -1,0 +1,118 @@
+<!doctype html>
+<!-- Store promo images. Render with scripts in this folder's README:
+     ?size=tile (440x280) | marquee (1400x560) | large (920x680) -->
+<html>
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --primary: #006642;
+    --primary-soft: #1f8a5f;
+    --accent: #daf0e0;
+    --paper: #f0ede6;
+    --ink: #1c2b23;
+    --ink-soft: #3c4c41;
+    --navy: #0b3a7a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--paper); font-family: 'DM Sans', sans-serif; color: var(--ink); overflow: hidden; }
+  .stage { position: relative; overflow: hidden; background: var(--paper); }
+  .stage::before { /* soft green wash behind the card side */
+    content: ''; position: absolute; border-radius: 50%;
+    background: radial-gradient(closest-side, var(--accent), rgba(218,240,224,0));
+  }
+  .brand { display: flex; align-items: center; }
+  .brand img { display: block; }
+  .word { font-family: 'Manrope', sans-serif; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); }
+  .word span { color: var(--primary); }
+  h1 { font-family: 'Manrope', sans-serif; font-weight: 800; letter-spacing: -0.025em; line-height: 1.05; color: var(--ink); }
+  h1 em { font-style: normal; color: var(--primary); }
+  p.sub { color: var(--ink-soft); line-height: 1.4; }
+
+  /* the flow card: page -> citation -> attached */
+  .card { position: absolute; background: #fff; border-radius: 18px;
+          box-shadow: 0 24px 60px rgba(28,43,35,.16), 0 2px 6px rgba(28,43,35,.08); }
+  .bar { display: flex; gap: 6px; align-items: center; padding: 14px 18px; border-bottom: 1px solid #ece9e1; }
+  .bar i { width: 10px; height: 10px; border-radius: 50%; background: #e2ddd2; display: block; }
+  .bar .url { margin-left: 10px; flex: 1; height: 22px; border-radius: 11px; background: #f4f2ec;
+              font-size: 12px; color: #8a8f88; display: flex; align-items: center; padding: 0 12px; }
+  .bar .btn { width: 26px; height: 26px; border-radius: 50%; background: var(--primary);
+              display: grid; place-items: center; box-shadow: 0 0 0 5px rgba(0,102,66,.15); }
+  .bar .btn img { width: 20px; height: 20px; }
+  .body { padding: 20px 22px; }
+  .label { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--primary); margin-bottom: 8px; }
+  .cite { font-size: 14px; line-height: 1.5; color: var(--ink); background: #f8f7f3; border-left: 3px solid var(--primary);
+          padding: 12px 14px; border-radius: 6px; }
+  .cite b { font-weight: 600; }
+  .people { display: flex; gap: 10px; margin-top: 16px; }
+  .person { flex: 1; display: flex; align-items: center; gap: 10px; border: 1px solid #ece9e1; border-radius: 12px; padding: 10px 12px; }
+  .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: var(--primary);
+            font-weight: 700; font-size: 13px; display: grid; place-items: center; flex: none; }
+  .person .n { font-size: 13px; font-weight: 600; }
+  .person .d { font-size: 11px; color: #8a8f88; }
+  .check { margin-left: auto; width: 22px; height: 22px; border-radius: 50%; background: var(--primary); color: #fff;
+           font-size: 13px; display: grid; place-items: center; flex: none; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; background: var(--primary); color: #fff;
+          font-weight: 600; border-radius: 999px; }
+
+  /* ---- 440 x 280 small tile ---- */
+  .tile { width: 440px; height: 280px; padding: 30px 30px; }
+  .tile::before { width: 420px; height: 420px; right: -170px; top: -120px; }
+  .tile .brand { gap: 10px; position: relative; }
+  .tile .brand img { width: 46px; height: 46px; }
+  .tile .word { font-size: 25px; }
+  .tile h1 { position: relative; font-size: 38px; margin-top: 30px; }
+  .tile p.sub { position: relative; font-size: 17px; margin-top: 14px; }
+
+  /* ---- 1400 x 560 marquee ---- */
+  .marquee { width: 1400px; height: 560px; padding: 70px 90px; }
+  .marquee::before { width: 1000px; height: 1000px; right: -260px; top: -260px; }
+  .marquee .brand { gap: 16px; position: relative; }
+  .marquee .brand img { width: 64px; height: 64px; }
+  .marquee .word { font-size: 36px; }
+  .marquee h1 { position: relative; font-size: 64px; margin-top: 44px; max-width: 640px; }
+  .marquee p.sub { position: relative; font-size: 22px; margin-top: 22px; max-width: 560px; }
+  .marquee .card { right: 90px; top: 50%; transform: translateY(-50%); width: 560px; }
+
+  /* ---- 920 x 680 large tile ---- */
+  .large { width: 920px; height: 680px; padding: 64px 70px; }
+  .large::before { width: 900px; height: 900px; right: -300px; bottom: -380px; }
+  .large .brand { gap: 14px; position: relative; }
+  .large .brand img { width: 56px; height: 56px; }
+  .large .word { font-size: 31px; }
+  .large h1 { position: relative; font-size: 52px; margin-top: 34px; max-width: 700px; }
+  .large p.sub { position: relative; font-size: 20px; margin-top: 16px; max-width: 640px; }
+  .large .card { left: 70px; right: 70px; bottom: 56px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  const size = new URLSearchParams(location.search).get('size') || 'tile';
+  const brand = `<div class="brand"><img src="mark.png" alt=""><div class="word">Record<span>Seek</span></div></div>`;
+  const card = `
+    <div class="card">
+      <div class="bar"><i></i><i></i><i></i>
+        <div class="url">1880 United States Census · John Smith · Ohio</div>
+        <div class="btn"><img src="mark.png" alt=""></div>
+      </div>
+      <div class="body">
+        <div class="label">Source citation</div>
+        <div class="cite">"United States Census, 1880," database, <b>John Smith</b>, Franklin, Ohio; citing enumeration district 12, sheet 4B.</div>
+        <div class="label" style="margin-top:18px">Attached to</div>
+        <div class="people">
+          <div class="person"><div class="avatar">JS</div><div><div class="n">John Smith</div><div class="d">1842 – 1911</div></div><div class="check">✓</div></div>
+          <div class="person"><div class="avatar">MS</div><div><div class="n">Mary Smith</div><div class="d">1846 – 1920</div></div><div class="check">✓</div></div>
+        </div>
+      </div>
+    </div>`;
+  const copy = {
+    tile: `${brand}<h1>Every discovery,<br><em>a proper source.</em></h1><p class="sub">Cite any record you find online in one click.</p>`,
+    marquee: `${brand}<h1>Every discovery deserves <em>to be kept.</em></h1><p class="sub">Turn any web page into a proper source citation and attach it to your family tree in FamilySearch or Ancestry.</p>${card}`,
+    large: `${brand}<h1>One click from discovery<br><em>to source.</em></h1><p class="sub">Cite any record you find online and attach it to the right people in your tree.</p>${card}`,
+  };
+  document.getElementById('root').innerHTML = `<div class="stage ${size}">${copy[size]}</div>`;
+</script>
+</body>
+</html>
