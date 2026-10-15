@@ -520,6 +520,7 @@
 				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2026 SimpleRain, Inc.";
 				INFOPLIST_KEY_NSMainStoryboardFile = Main;
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.reference";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -563,6 +564,7 @@
 				INFOPLIST_KEY_NSHumanReadableCopyright = "© 2026 SimpleRain, Inc.";
 				INFOPLIST_KEY_NSMainStoryboardFile = Main;
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.reference";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
