@@ -35,13 +35,27 @@ function invokeRecordSeek() {
   }
 }
 
+function hasRecordSeek() {
+  return typeof RecordSeek === "function";
+}
+
+// Scripts are injected on click through activeTab, so the extension needs no
+// access to a page until the user asks for it.
 function runOnTab(tab) {
   if (!canRun(tab)) {
     return;
   }
-  api.scripting.executeScript({
-    target: { tabId: tab.id },
-    func: invokeRecordSeek
+  var target = { tabId: tab.id };
+  api.scripting.executeScript({ target: target, func: hasRecordSeek }).then(function (results) {
+    if (results && results[0] && results[0].result) {
+      return;
+    }
+    return api.scripting.executeScript({
+      target: target,
+      files: ["js/browser.js", "lib/genscrape.js", "js/content.js"]
+    });
+  }).then(function () {
+    return api.scripting.executeScript({ target: target, func: invokeRecordSeek });
   }).catch(function () {});
 }
 
@@ -69,6 +83,10 @@ function openShare(request) {
   }
 
   api.storage.local.set({ lastSource: Date.now() });
+  // Firefox for Android has no windows API, so the share page opens in a tab.
+  if (!api.windows) {
+    return api.tabs.create({ url: request.url });
+  }
   return api.windows.create(createData).catch(function () {
     return api.tabs.create({ url: request.url });
   });
@@ -106,15 +124,18 @@ function ensureMenu() {
 
 api.action.onClicked.addListener(runOnTab);
 
-api.contextMenus.onClicked.addListener(function (info, tab) {
-  if (info.menuItemId === MENU_ID) {
-    runOnTab(tab);
-  }
-});
+// Firefox for Android has no context menus; the toolbar action still works.
+if (api.contextMenus) {
+  api.contextMenus.onClicked.addListener(function (info, tab) {
+    if (info.menuItemId === MENU_ID) {
+      runOnTab(tab);
+    }
+  });
 
-api.runtime.onInstalled.addListener(ensureMenu);
-api.runtime.onStartup.addListener(ensureMenu);
-ensureMenu();
+  api.runtime.onInstalled.addListener(ensureMenu);
+  api.runtime.onStartup.addListener(ensureMenu);
+  ensureMenu();
+}
 
 api.runtime.onMessage.addListener(function (request, sender) {
   if (!request || request.action !== "newTab" || !request.url) {

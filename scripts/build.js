@@ -113,6 +113,11 @@ function buildOne(id, config) {
   if (background.service_worker !== "js/background.js" || !background.scripts || background.scripts[0] !== "js/background.js") {
     throw new Error(id + " background must declare both scripts and service_worker");
   }
+  // AMO lint flags service_worker as unsupported; Firefox only runs scripts.
+  if (id === "firefox") {
+    delete background.service_worker;
+    fs.writeFileSync(path.join(dest, "manifest.json"), JSON.stringify(manifest, null, 4) + "\n");
+  }
 
   var archive = id === "firefox" ? "xpi" : "zip";
   var distDir = path.join(distRoot, id);

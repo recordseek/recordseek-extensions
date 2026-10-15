@@ -55,7 +55,7 @@
 		<dict>
 			<key>End</key>
 			<array>
-				<string>lib/genscrape.min.js</string>
+				<string>lib/genscrape.js</string>
 				<string>js/browser.js</string>
 				<string>js/content.js</string>
 			</array>

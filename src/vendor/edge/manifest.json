@@ -28,15 +28,16 @@
         "service_worker": "js/background.js"
     },
     "permissions": [
-        "tabs",
+        "activeTab",
         "contextMenus",
         "cookies",
         "storage",
         "scripting"
     ],
     "host_permissions": [
-        "http://*/*",
-        "https://*/*"
+        "https://recordseek.com/*",
+        "https://*.recordseek.com/*",
+        "https://*.familysearch.org/*"
     ],
     "options_ui": {
         "page": "html/options.html"
@@ -44,24 +45,13 @@
     "content_scripts": [
         {
             "matches": [
-                "http://*/*",
-                "https://*/*"
+                "https://recordseek.com/*",
+                "https://*.recordseek.com/*"
             ],
             "js": [
                 "js/browser.js",
-                "lib/genscrape.min.js",
+                "lib/genscrape.js",
                 "js/content.js"
-            ]
-        }
-    ],
-    "web_accessible_resources": [
-        {
-            "resources": [
-                "js/*"
-            ],
-            "matches": [
-                "http://*/*",
-                "https://*/*"
             ]
         }
     ]

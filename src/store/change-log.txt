@@ -1,4 +1,12 @@
 +---------+
+| 2.6.1   |
++---------+
+
+* Least-privilege permissions: RecordSeek now runs on a page only when you click it (activeTab). It no longer reads every site you visit.
+* Host access is limited to recordseek.com and familysearch.org. Removed the "tabs" permission and web-accessible resources.
+* genscrape is bundled unminified, so reviewers can read it, and parses HTML without innerHTML.
+
++---------+
 | 2.6.0   |
 +---------+
 
