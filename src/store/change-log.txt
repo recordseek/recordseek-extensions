@@ -1,4 +1,10 @@
 +---------+
+| 2.6.3   |
++---------+
+
+* Firefox: requires Firefox 140 or later (Firefox for Android 142), the versions that support the data collection declaration.
+
++---------+
 | 2.6.2   |
 +---------+
 
