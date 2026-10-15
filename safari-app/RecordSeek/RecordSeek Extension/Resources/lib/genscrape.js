@@ -1,6 +1,6 @@
-/*! genscrape v1.5.2 (rootsdev/genscrape@2a1205ace3c89c9f2da3f49ac4ea72458f47cbd8) | MIT (c) Justin York | https://github.com/rootsdev/genscrape
- * Patched: innerHTML writes on detached nodes replaced with DOMParser (inert parsing).
- * Unminified build: npm install --omit=dev && npx esbuild@0.24.0 src/main.js --bundle --format=iife --global-name=genscrape --platform=browser --target=es2017 --legal-comments=inline */
+/*! genscrape v1.6.0 (rootsdev/genscrape@05f45e98ee56decd3f76587855518b9993f0bc87) | MIT (c) Justin York | https://github.com/rootsdev/genscrape
+ * Patched: innerHTML writes on detached nodes replaced with DOMParser (inert parsing); AMD detection disabled so a page-level define() cannot capture dependencies.
+ * Unminified build: npm install --omit=dev && npx esbuild@0.24.0 src/main.js --bundle --format=iife --global-name=genscrape --platform=browser --target=es2017 --legal-comments=inline --define:define=undefined */
 var genscrape = (() => {
   var __getOwnPropNames = Object.getOwnPropertyNames;
   var __commonJS = (cb, mod) => function __require() {
@@ -17,14 +17,27 @@ var genscrape = (() => {
       var y = d * 365.25;
       module.exports = function(val, options) {
         options = options || {};
-        if ("string" == typeof val) return parse(val);
-        return options.long ? long(val) : short(val);
+        var type = typeof val;
+        if (type === "string" && val.length > 0) {
+          return parse(val);
+        } else if (type === "number" && isNaN(val) === false) {
+          return options.long ? fmtLong(val) : fmtShort(val);
+        }
+        throw new Error(
+          "val is not a non-empty string or a valid number. val=" + JSON.stringify(val)
+        );
       };
       function parse(str) {
-        str = "" + str;
-        if (str.length > 1e4) return;
-        var match = /^((?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|years?|yrs?|y)?$/i.exec(str);
-        if (!match) return;
+        str = String(str);
+        if (str.length > 100) {
+          return;
+        }
+        var match = /^((?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|years?|yrs?|y)?$/i.exec(
+          str
+        );
+        if (!match) {
+          return;
+        }
         var n = parseFloat(match[1]);
         var type = (match[2] || "ms").toLowerCase();
         switch (type) {
@@ -62,30 +75,44 @@ var genscrape = (() => {
           case "msec":
           case "ms":
             return n;
+          default:
+            return void 0;
         }
       }
-      function short(ms) {
-        if (ms >= d) return Math.round(ms / d) + "d";
-        if (ms >= h) return Math.round(ms / h) + "h";
-        if (ms >= m) return Math.round(ms / m) + "m";
-        if (ms >= s) return Math.round(ms / s) + "s";
+      function fmtShort(ms) {
+        if (ms >= d) {
+          return Math.round(ms / d) + "d";
+        }
+        if (ms >= h) {
+          return Math.round(ms / h) + "h";
+        }
+        if (ms >= m) {
+          return Math.round(ms / m) + "m";
+        }
+        if (ms >= s) {
+          return Math.round(ms / s) + "s";
+        }
         return ms + "ms";
       }
-      function long(ms) {
+      function fmtLong(ms) {
         return plural(ms, d, "day") || plural(ms, h, "hour") || plural(ms, m, "minute") || plural(ms, s, "second") || ms + " ms";
       }
       function plural(ms, n, name) {
-        if (ms < n) return;
-        if (ms < n * 1.5) return Math.floor(ms / n) + " " + name;
+        if (ms < n) {
+          return;
+        }
+        if (ms < n * 1.5) {
+          return Math.floor(ms / n) + " " + name;
+        }
         return Math.ceil(ms / n) + " " + name + "s";
       }
     }
   });
 
-  // node_modules/debug/debug.js
+  // node_modules/debug/src/debug.js
   var require_debug = __commonJS({
-    "node_modules/debug/debug.js"(exports, module) {
-      exports = module.exports = debug;
+    "node_modules/debug/src/debug.js"(exports, module) {
+      exports = module.exports = createDebug.debug = createDebug["default"] = createDebug;
       exports.coerce = coerce;
       exports.disable = disable;
       exports.enable = enable;
@@ -94,32 +121,35 @@ var genscrape = (() => {
       exports.names = [];
       exports.skips = [];
       exports.formatters = {};
-      var prevColor = 0;
       var prevTime;
-      function selectColor() {
-        return exports.colors[prevColor++ % exports.colors.length];
-      }
-      function debug(namespace) {
-        function disabled() {
+      function selectColor(namespace) {
+        var hash = 0, i;
+        for (i in namespace) {
+          hash = (hash << 5) - hash + namespace.charCodeAt(i);
+          hash |= 0;
         }
-        disabled.enabled = false;
-        function enabled2() {
-          var self = enabled2;
+        return exports.colors[Math.abs(hash) % exports.colors.length];
+      }
+      function createDebug(namespace) {
+        function debug() {
+          if (!debug.enabled) return;
+          var self = debug;
           var curr = +/* @__PURE__ */ new Date();
           var ms = curr - (prevTime || curr);
           self.diff = ms;
           self.prev = prevTime;
           self.curr = curr;
           prevTime = curr;
-          if (null == self.useColors) self.useColors = exports.useColors();
-          if (null == self.color && self.useColors) self.color = selectColor();
-          var args = Array.prototype.slice.call(arguments);
+          var args = new Array(arguments.length);
+          for (var i = 0; i < args.length; i++) {
+            args[i] = arguments[i];
+          }
           args[0] = exports.coerce(args[0]);
           if ("string" !== typeof args[0]) {
-            args = ["%o"].concat(args);
+            args.unshift("%O");
           }
           var index = 0;
-          args[0] = args[0].replace(/%([a-z%])/g, function(match, format) {
+          args[0] = args[0].replace(/%([a-zA-Z%])/g, function(match, format) {
             if (match === "%%") return match;
             index++;
             var formatter = exports.formatters[format];
@@ -131,20 +161,24 @@ var genscrape = (() => {
             }
             return match;
           });
-          if ("function" === typeof exports.formatArgs) {
-            args = exports.formatArgs.apply(self, args);
-          }
-          var logFn = enabled2.log || exports.log || console.log.bind(console);
+          exports.formatArgs.call(self, args);
+          var logFn = debug.log || exports.log || console.log.bind(console);
           logFn.apply(self, args);
         }
-        enabled2.enabled = true;
-        var fn = exports.enabled(namespace) ? enabled2 : disabled;
-        fn.namespace = namespace;
-        return fn;
+        debug.namespace = namespace;
+        debug.enabled = exports.enabled(namespace);
+        debug.useColors = exports.useColors();
+        debug.color = selectColor(namespace);
+        if ("function" === typeof exports.init) {
+          exports.init(debug);
+        }
+        return debug;
       }
       function enable(namespaces) {
         exports.save(namespaces);
-        var split = (namespaces || "").split(/[\s,]+/);
+        exports.names = [];
+        exports.skips = [];
+        var split = (typeof namespaces === "string" ? namespaces : "").split(/[\s,]+/);
         var len = split.length;
         for (var i = 0; i < len; i++) {
           if (!split[i]) continue;
@@ -180,9 +214,9 @@ var genscrape = (() => {
     }
   });
 
-  // node_modules/debug/browser.js
+  // node_modules/debug/src/browser.js
   var require_browser = __commonJS({
-    "node_modules/debug/browser.js"(exports, module) {
+    "node_modules/debug/src/browser.js"(exports, module) {
       exports = module.exports = require_debug();
       exports.log = log;
       exports.formatArgs = formatArgs;
@@ -199,24 +233,31 @@ var genscrape = (() => {
         "crimson"
       ];
       function useColors() {
-        return "WebkitAppearance" in document.documentElement.style || // is firebug? http://stackoverflow.com/a/398120/376773
-        window.console && (console.firebug || console.exception && console.table) || // is firefox >= v31?
+        if (typeof window !== "undefined" && window.process && window.process.type === "renderer") {
+          return true;
+        }
+        return typeof document !== "undefined" && document.documentElement && document.documentElement.style && document.documentElement.style.WebkitAppearance || // is firebug? http://stackoverflow.com/a/398120/376773
+        typeof window !== "undefined" && window.console && (window.console.firebug || window.console.exception && window.console.table) || // is firefox >= v31?
         // https://developer.mozilla.org/en-US/docs/Tools/Web_Console#Styling_messages
-        navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/) && parseInt(RegExp.$1, 10) >= 31;
+        typeof navigator !== "undefined" && navigator.userAgent && navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/) && parseInt(RegExp.$1, 10) >= 31 || // double check webkit in userAgent just in case we are in a worker
+        typeof navigator !== "undefined" && navigator.userAgent && navigator.userAgent.toLowerCase().match(/applewebkit\/(\d+)/);
       }
       exports.formatters.j = function(v) {
-        return JSON.stringify(v);
+        try {
+          return JSON.stringify(v);
+        } catch (err) {
+          return "[UnexpectedJSONParseError]: " + err.message;
+        }
       };
-      function formatArgs() {
-        var args = arguments;
+      function formatArgs(args) {
         var useColors2 = this.useColors;
         args[0] = (useColors2 ? "%c" : "") + this.namespace + (useColors2 ? " %c" : " ") + args[0] + (useColors2 ? "%c " : " ") + "+" + exports.humanize(this.diff);
-        if (!useColors2) return args;
+        if (!useColors2) return;
         var c = "color: " + this.color;
-        args = [args[0], c, "color: inherit"].concat(Array.prototype.slice.call(args, 1));
+        args.splice(1, 0, c, "color: inherit");
         var index = 0;
         var lastC = 0;
-        args[0].replace(/%[a-z%]/g, function(match) {
+        args[0].replace(/%[a-zA-Z%]/g, function(match) {
           if ("%%" === match) return;
           index++;
           if ("%c" === match) {
@@ -224,7 +265,6 @@ var genscrape = (() => {
           }
         });
         args.splice(lastC, 0, c);
-        return args;
       }
       function log() {
         return "object" === typeof console && console.log && Function.prototype.apply.call(console.log, console, arguments);
@@ -244,6 +284,9 @@ var genscrape = (() => {
         try {
           r = exports.storage.debug;
         } catch (e) {
+        }
+        if (!r && typeof process !== "undefined" && "env" in process) {
+          r = process.env.DEBUG;
         }
         return r;
       }
@@ -807,8 +850,8 @@ var genscrape = (() => {
             return [];
           }
         };
-        if (typeof define === "function" && define.amd) {
-          define(function() {
+        if (false) {
+          (void 0)(function() {
             return EventEmitter;
           });
         } else if (typeof exports === "object") {
@@ -6045,6 +6088,1042 @@ var genscrape = (() => {
     }
   });
 
+  // src/generic/structured.js
+  var require_structured = __commonJS({
+    "src/generic/structured.js"(exports, module) {
+      var debug = require_browser()("genscrape:generic:structured");
+      function isPersonType(type) {
+        if (!type) return false;
+        var types = Array.isArray(type) ? type : [type];
+        return types.some(function(t) {
+          return /(^|\/)Person$/i.test(String(t));
+        });
+      }
+      function first(v) {
+        return Array.isArray(v) ? v[0] : v;
+      }
+      function asArray(v) {
+        if (v === void 0 || v === null || v === "") return [];
+        return Array.isArray(v) ? v : [v];
+      }
+      function text(v) {
+        v = first(v);
+        if (v === void 0 || v === null) return "";
+        if (typeof v === "object") return text(v.name || v["@value"] || v.value || "");
+        return String(v).replace(/\s+/g, " ").trim();
+      }
+      function placeText(v) {
+        v = first(v);
+        if (!v) return "";
+        if (typeof v !== "object") return text(v);
+        if (v.name) return text(v.name);
+        var addr = first(v.address);
+        if (addr && typeof addr === "object") {
+          return ["streetAddress", "addressLocality", "addressRegion", "addressCountry"].map(function(k) {
+            return text(addr[k]);
+          }).filter(Boolean).join(", ");
+        }
+        return text(addr);
+      }
+      function collectJsonLd(document2) {
+        var nodes = [];
+        var scripts = document2.querySelectorAll('script[type="application/ld+json"]');
+        Array.prototype.forEach.call(scripts, function(s) {
+          try {
+            walk(JSON.parse(s.textContent));
+          } catch (e) {
+            debug("bad json-ld", e.message);
+          }
+        });
+        function walk(node) {
+          if (Array.isArray(node)) {
+            node.forEach(walk);
+            return;
+          }
+          if (!node || typeof node !== "object") return;
+          nodes.push(node);
+          Object.keys(node).forEach(function(k) {
+            if (k !== "@context") walk(node[k]);
+          });
+        }
+        return nodes;
+      }
+      function microdataValue(el) {
+        var tag = el.tagName.toLowerCase();
+        if (el.hasAttribute("content")) return el.getAttribute("content");
+        if (tag === "meta") return el.getAttribute("content") || "";
+        if (/^(a|link|area)$/.test(tag)) return el.getAttribute("href") || "";
+        if (/^(img|audio|video|source|iframe|embed)$/.test(tag)) return el.getAttribute("src") || "";
+        if (tag === "time" && el.hasAttribute("datetime")) return el.getAttribute("datetime");
+        return (el.textContent || "").replace(/\s+/g, " ").trim();
+      }
+      function microdataItem(scope) {
+        var item = { "@type": scope.getAttribute("itemtype") || "" };
+        (function walk(parent) {
+          Array.prototype.forEach.call(parent.children, function(child) {
+            var props = child.getAttribute("itemprop");
+            var isScope = child.hasAttribute("itemscope");
+            if (props) {
+              var value = isScope ? microdataItem(child) : microdataValue(child);
+              props.trim().split(/\s+/).forEach(function(p) {
+                item[p] = item[p] === void 0 ? value : asArray(item[p]).concat([value]);
+              });
+            }
+            if (!isScope) walk(child);
+          });
+        })(scope);
+        return item;
+      }
+      function collectMicrodata(document2) {
+        var nodes = [];
+        Array.prototype.forEach.call(document2.querySelectorAll("[itemscope]"), function(el) {
+          if (isPersonType(el.getAttribute("itemtype"))) {
+            var item = microdataItem(el);
+            item._topLevel = !el.hasAttribute("itemprop");
+            nodes.push(item);
+          }
+        });
+        return nodes;
+      }
+      function personToRecord(p, byId) {
+        function resolve(v) {
+          if (v && typeof v === "object" && v["@id"] && byId[v["@id"]]) return byId[v["@id"]];
+          return v;
+        }
+        var rec = {
+          name: {
+            full: text(p.name),
+            given: text(p.givenName),
+            surname: text(p.familyName)
+          },
+          gender: null,
+          events: {},
+          relatives: []
+        };
+        var g = text(p.gender).toLowerCase();
+        if (/female|woman|^f$/.test(g)) rec.gender = "Female";
+        else if (/male|man|^m$/.test(g)) rec.gender = "Male";
+        [["Birth", "birth"], ["Death", "death"]].forEach(function(e) {
+          var date = text(p[e[1] + "Date"]), place = placeText(p[e[1] + "Place"]);
+          if (date || place) rec.events[e[0]] = { date, place };
+        });
+        var home = placeText(p.homeLocation);
+        if (home) rec.events.Residence = { date: "", place: home };
+        var job = text(p.jobTitle);
+        if (job) rec.events.Occupation = { value: job };
+        [["parent", "parent"], ["parent", "parents"], ["spouse", "spouse"], ["child", "children"]].forEach(function(r) {
+          asArray(p[r[1]]).forEach(function(rel) {
+            rel = resolve(rel);
+            var name = typeof rel === "object" ? text(rel.name) || [text(rel.givenName), text(rel.familyName)].join(" ").trim() : text(rel);
+            if (name && !/^https?:/.test(name)) {
+              rec.relatives.push({ role: r[0], name, gender: rel && typeof rel === "object" ? personToRecord(rel, byId).gender : null });
+            }
+          });
+        });
+        return rec;
+      }
+      function score(p) {
+        return Object.keys(p).length + (p._topLevel ? 100 : 0) + (p.mainEntityOfPage ? 50 : 0);
+      }
+      function extract(document2, url, root) {
+        var jsonld = collectJsonLd(document2);
+        var byId = {};
+        jsonld.forEach(function(n) {
+          if (n["@id"]) byId[n["@id"]] = n;
+        });
+        var mainIds = jsonld.map(function(n) {
+          return n.mainEntity && n.mainEntity["@id"];
+        }).filter(Boolean);
+        var people = jsonld.filter(function(n) {
+          return isPersonType(n["@type"]) && (n.name || n.givenName || n.familyName);
+        });
+        var strategy = "jsonld";
+        if (!people.length) {
+          people = collectMicrodata(document2);
+          strategy = "microdata";
+        }
+        if (!people.length) return null;
+        var principal = people.filter(function(p) {
+          return mainIds.indexOf(p["@id"]) !== -1;
+        })[0] || people.slice().sort(function(a, b) {
+          return score(b) - score(a);
+        })[0];
+        var record = personToRecord(principal, byId);
+        if (!record.name.full && !record.name.given && !record.name.surname) return null;
+        return { record, strategy };
+      }
+      module.exports = { extract };
+    }
+  });
+
+  // src/generic/dates.js
+  var require_dates = __commonJS({
+    "src/generic/dates.js"(exports, module) {
+      var MONTHS = [
+        // en, fr, de, nl, no/da, sv, es (full and common abbreviations)
+        ["january", "jan", "janvier", "janv", "januar", "januari", "enero", "ene", "j\xE4nner"],
+        ["february", "feb", "febr", "fevrier", "fev", "februar", "februari", "febrero"],
+        ["march", "mar", "mars", "marz", "maart", "mrt", "marzo"],
+        ["april", "apr", "avril", "avr", "abril", "abr"],
+        ["may", "mai", "mei", "maj", "mayo"],
+        ["june", "jun", "juin", "juni", "junio"],
+        ["july", "jul", "juillet", "juil", "juli", "julio"],
+        ["august", "aug", "aout", "augustus", "agosto", "ago"],
+        ["september", "sep", "sept", "septembre", "septiembre"],
+        ["october", "oct", "octobre", "oktober", "okt", "octubre"],
+        ["november", "nov", "novembre", "noviembre"],
+        ["december", "dec", "decembre", "dezember", "dez", "desember", "diciembre", "dic"]
+      ];
+      var monthIndex = {};
+      MONTHS.forEach(function(names, i) {
+        names.forEach(function(n) {
+          monthIndex[n] = i + 1;
+        });
+      });
+      var MONTH_RE = "(?:" + Object.keys(monthIndex).sort(function(a, b) {
+        return b.length - a.length;
+      }).join("|") + ")\\.?";
+      var QUAL_RE = "(?:(?:abt|about|circa|ca|c|bef|before|aft|after|est|estimated|vers|rond|omstreeks|um|ca|between|bet|le|on|den|der|am)\\.?\\s+)?";
+      var DAY_RE = "(?:[0-3]?\\d)(?:st|nd|rd|th|er|e|\\.)?";
+      var YEAR_RE = "(?:1[0-9]{3}|20[0-9]{2})";
+      var DATE_PATTERNS = [
+        // 12 January 1850 / 12. Januar 1850 / 12 jan. 1850
+        DAY_RE + "\\s+" + MONTH_RE + ",?\\s+" + YEAR_RE,
+        // January 12, 1850
+        MONTH_RE + "\\s+" + DAY_RE + ",?\\s+" + YEAR_RE,
+        // 1850-01-12
+        YEAR_RE + "-[01]?\\d-[0-3]?\\d",
+        // 12/01/1850, 12.01.1850, 12-01-1850
+        "[0-3]?\\d[\\/.\\-][01]?\\d[\\/.\\-]" + YEAR_RE,
+        // Quarter style (FreeBMD etc.): Mar 1850 / Q1 1850
+        "(?:q[1-4]|" + MONTH_RE + ")\\s+(?:quarter\\s+)?" + YEAR_RE,
+        // 1850
+        YEAR_RE
+      ];
+      var DATE_RE = new RegExp("(?:^|[^\\w])(" + QUAL_RE + "(?:" + DATE_PATTERNS.join("|") + "))(?![\\w])", "i");
+      function stripAccents(s) {
+        return s.normalize ? s.normalize("NFD").replace(/[̀-ͯ]/g, "") : s;
+      }
+      function findDate(text) {
+        if (!text) return null;
+        var m = DATE_RE.exec(stripAccents(text));
+        if (!m) return null;
+        var start = m.index + m[0].indexOf(m[1]);
+        return { text: text.substr(start, m[1].length).trim(), index: start };
+      }
+      var PLACE_LEAD = /^[\s,;:\-–—]*(?:(?:in|at|a|à|te|i|en|zu|im|au|aux|bei|near)\s+)?/i;
+      function cleanPlace(s) {
+        if (!s) return "";
+        s = s.replace(PLACE_LEAD, "").replace(/[\s,;:\-–—]+$/, "").trim();
+        return /[a-z]/i.test(s) ? s : "";
+      }
+      function splitDatePlace(text) {
+        text = (text || "").replace(/\s+/g, " ").trim();
+        var d = findDate(text);
+        if (!d) {
+          return { date: "", place: cleanPlace(text) };
+        }
+        var before = text.substr(0, d.index), after = text.substr(d.index + d.text.length);
+        return {
+          date: d.text,
+          place: cleanPlace(after) || cleanPlace(before)
+        };
+      }
+      function parseDateParts(text) {
+        text = stripAccents((text || "").toLowerCase());
+        var years = text.match(/\b(1[0-9]{3}|20[0-9]{2})\b/g) || [];
+        var month = null, day = null, m;
+        var words = text.match(/[a-z]+/g) || [];
+        for (var i = 0; i < words.length; i++) {
+          if (monthIndex[words[i]] && words[i] !== "c") {
+            month = monthIndex[words[i]];
+            break;
+          }
+        }
+        if (m = /\b(1[0-9]{3}|20[0-9]{2})-([01]?\d)-([0-3]?\d)\b/.exec(text)) {
+          month = +m[2];
+          day = +m[3];
+        } else if (m = /\b([0-3]?\d)[\/.\-]([01]?\d)[\/.\-](1[0-9]{3}|20[0-9]{2})\b/.exec(text)) {
+          day = +m[1];
+          month = +m[2];
+        } else if ((m = /\b([0-3]?\d)(?:st|nd|rd|th|er|e|\.)?\s+[a-z]/.exec(text)) && month) {
+          day = +m[1];
+        } else if ((m = /[a-z]\.?\s+([0-3]?\d)(?:st|nd|rd|th)?,?\s+\d{4}/.exec(text)) && month) {
+          day = +m[1];
+        }
+        return { years, month, day };
+      }
+      module.exports = {
+        findDate,
+        splitDatePlace,
+        parseDateParts,
+        stripAccents
+      };
+    }
+  });
+
+  // src/generic/labels.js
+  var require_labels = __commonJS({
+    "src/generic/labels.js"(exports, module) {
+      var stripAccents = require_dates().stripAccents;
+      var FIELDS = [
+        // Relatives (must come before the plain name/given/surname rules)
+        ["groomGiven", /^(groom|bridegroom|bruidegom) (forenames?|first names?|given names?|christian names?|voornaam)$/],
+        ["groomSurname", /^(groom|bridegroom|bruidegom) (surname|last name|family name|achternaam)$/],
+        ["groom", /^(groom|bridegroom|bruidegom|epoux|brautigam|brudgom)( name)?$/],
+        ["brideGiven", /^(bride|bruid) (forenames?|first names?|given names?|christian names?|voornaam)$/],
+        ["brideSurname", /^(bride|bruid) (surname|last name|family name|maiden name|achternaam)$/],
+        ["bride", /^(bride|bruid|epouse|braut|brud)( name)?$/],
+        ["fatherGiven", /^father (forenames?|first names?|given names?|christian names?|voornaam|prenoms?)$/],
+        ["fatherSurname", /^father (surname|last name|family name|achternaam)$/],
+        ["motherMaiden", /^mother (maiden (name|surname)|nee)$|^maiden name$/],
+        ["motherGiven", /^mother (forenames?|first names?|given names?|christian names?|voornaam|prenoms?)$/],
+        ["motherSurname", /^mother (surname|last name|family name|achternaam)$/],
+        ["father", /^(father|father (full )?name|name of father|vader|pere|vater|far|fader|padre|son of)$/],
+        ["mother", /^(mother|mother (full )?name|name of mother|moeder|mere|mutter|mor|moder|madre)$/],
+        ["relationToHead", /^(relationship|relation|relation to head|relationship to head|rel to head|family position|position in family|familiestilling|stilling i familien|stellung)$/],
+        ["parents", /^(parents?|ouders|eltern|foreldre|foraldrar|forældre|padres|child of|son daughter of)$/],
+        ["spouse", /^(spouses?|husband|wife|partner|spouse name|married to|echtgeno(o|te)|partner|epoux|epouse|conjoint|ehemann|ehefrau|ehepartner|ektefelle|aegtefaelle|make|maka|hustru|esposo|esposa|conyuge)$/],
+        ["children", /^(children|child|kinderen|kind|enfants?|kinder|barn|hijos)$/],
+        // Principal identity
+        ["given", /^(given names?|givennames?|first names?|firstname|forenames?|christian names?|voornamen?|prenoms?|vornamen?|fornavn|fornamn|nombres?)$/],
+        ["surname", /^(surnames?|last names?|family names?|lastname|familyname|achternaam|nom de famille|nom|nachname|familienname|etternavn|efternamn|apellidos?)$/],
+        ["name", /^(full name|fullname|name|naam|navn|namn|nombre|person|person name|nom complet)$/],
+        ["gender", /^(sex|gender|geslacht|sexe|geschlecht|kjonn|kon|kjoenn|sexo)$/],
+        ["age", /^(age|age at death|age at burial|leeftijd|alder|alter|edad)$/],
+        ["occupation", /^(occupation|profession|beroep|metier|beruf|yrke|stilling|ocupacion|trade)$/],
+        ["residence", /^(residence|abode|address|woonplaats|domicile|wohnort|bosted|bustad|hometown|home town|place of residence|place of association|lives in|residence place)$/],
+        ["maritalStatus", /^(marital status|condition|civil status|burgerlijke staat|etat civil|situation familiale|familienstand|sivilstand|civilstand|estado civil)$/],
+        ["religion", /^(religion|godsdienst|religion|konfession|tro)$/],
+        // Birth
+        ["birthDate", /^(date of birth|birth date|birthdate|year of birth|birth year|born year|born on|dob|geboortedatum|date de naissance|geburtsdatum|fodselsdato|fodselsdag|fecha de nacimiento|fodelsedatum)$/],
+        ["birthPlace", /^(place of birth|birth place|birthplace|birth location|born in|where born|birth (county|parish|town|country|state|province|city)|geboorteplaats|lieu de naissance|geburtsort|fodested|fodested|fodselssted|lugar de nacimiento|fodelseort)$/],
+        ["birth", /^(born|birth|geboren|geboorte|naissance|ne|nee|fodt|fodd|nacimiento|geburt)$/],
+        // Baptism
+        ["baptismDate", /^(baptism date|year of baptism|baptism year|date of baptism|christening date|baptised on|doopdatum|date de bapteme|taufdatum|dapsdato|fecha de bautismo)$/],
+        ["baptismPlace", /^(baptism place|place of baptism|christening place|doopplaats|lieu de bapteme|taufort|dapssted)$/],
+        ["baptism", /^(baptism|baptised|baptized|christening|christened|gedoopt|doop|bapteme|baptise|taufe|getauft|dap|dopt|dopte|daab|bautismo)$/],
+        // Death
+        ["deathDate", /^(date of death|death date|deathdate|year of death|death year|died on|overlijdensdatum|date de deces|sterbedatum|todesdatum|dodsdato|dodsdag|fecha de defuncion|dodsdatum)$/],
+        ["deathPlace", /^(place of death|death place|deathplace|death location|died in|overlijdensplaats|lieu de deces|sterbeort|dodssted|dodsort|lugar de defuncion)$/],
+        ["death", /^(died|death|deceased|overleden|overlijden|deces|decede|decedee|gestorben|tod|dod|dode|dodd|fallecimiento|defuncion)$/],
+        ["deathCause", /^(cause of death|doodsoorzaak|cause du deces|todesursache|dodsarsak)$/],
+        // Burial
+        ["burialDate", /^(burial date|burialdate|year of burial|burial year|date of burial|buried on|interment date|begraafdatum|date d inhumation|begrabnisdatum|begravelsesdato)$/],
+        ["cemetery", /^(cemetery|cemetery name|burial place|place of burial|grave|cemetery or memorial|memorial|begraafplaats|cimetiere|friedhof|kirkegard|kyrkogard|cementerio|buried at|buried or commemorated at|commemorated|commemorated at|burial location|interment)$/],
+        ["burial", /^(burial|buried|begraven|begrafenis|inhumation|inhume|beerdigt|begraben|beerdigung|begravd|begravet|gravlagt|entierro)$/],
+        // Marriage
+        ["marriageDate", /^(marriage date|year of marriage|marriage year|date of marriage|married on|huwelijksdatum|trouwdatum|date de mariage|heiratsdatum|vigseldatum|vielsesdato|fecha de matrimonio)$/],
+        ["marriagePlace", /^(marriage place|place of marriage|married in|huwelijksplaats|lieu de mariage|heiratsort|vigselort)$/],
+        ["marriage", /^(married|marriage|huwelijk|getrouwd|mariage|marie|mariee|heirat|verheiratet|hochzeit|gift|vigsel|viet|matrimonio)$/],
+        // Military
+        ["serviceNumber", /^(service (number|no)|regimental (number|no)|serial (number|no)|service id|army number)$/],
+        ["rank", /^(rank|grade|dienstgrad|grad|rang)$/],
+        ["unit", /^(unit|regiment|battalion|regiment service|unit name|regiment or unit|service branch|branch of service|branch|division|corps|ship)$/],
+        ["conflict", /^(conflict|war|campaign|conflict period)$/],
+        // Generic record event (record sites: "Record type", "Date", "Place")
+        ["censusYear", /^(census|census year|year of census|folketelling|volkstelling|recensement|volkszahlung)$/],
+        ["eventType", /^(record type|event type|event|type|type of record|soort akte|soort registratie|aktetype|type d acte|kildetype|kirkebokstype|registration type)$/],
+        ["date", /^(date|datum|dato|fecha|event date|registration date|year)$/],
+        ["place", /^(place|plaats|lieu|ort|sted|lugar|location|event place|parish|church|church name|registration district|registration area|reg area|sr district reg area|district|county|country|state|province|town|city|village|municipality|gemeente|commune|gemeinde|kommune|kirkesogn|prestegjeld)$/]
+      ];
+      var EVENT_WORDS = [
+        ["Baptism", /bapt|christen|doop|dap|taufe|bautis/],
+        ["Birth", /birth|geboort|naissance|fodsel|fodt|geburt|nacim/],
+        ["Marriage", /marri|huwelijk|mariage|heirat|vigsel|viels|matrimon|banns/],
+        ["Burial", /burial|begra|inhum|beerd|gravl|entierr/],
+        ["Death", /death|overlijd|deces|sterbe|dod|defunc/],
+        ["Census", /census|volkstelling|recensement|volkszahl|folketelling|folkrakning|censo/]
+      ];
+      function normalizeLabel(label) {
+        return stripAccents((label || "").toLowerCase()).replace(/\(.*$/, "").replace(/['’]s\b/g, "").replace(/[^a-z0-9]+/g, " ").trim().replace(/^(burial|baptism|marriage|birth|death|christening) (person|deceased|child) (?=\w)/, "").replace(/^(person|principal|child|deceased|individual|subject|the) (?=\w)/, "").trim();
+      }
+      function fieldForLabel(label) {
+        var norm = normalizeLabel(label);
+        if (!norm || norm.length > 40) return null;
+        for (var i = 0; i < FIELDS.length; i++) {
+          if (FIELDS[i][1].test(norm)) return FIELDS[i][0];
+        }
+        return null;
+      }
+      function eventTypeForText(text) {
+        var norm = normalizeLabel(text);
+        for (var i = 0; i < EVENT_WORDS.length; i++) {
+          if (EVENT_WORDS[i][1].test(norm)) return EVENT_WORDS[i][0];
+        }
+        return null;
+      }
+      var NULLISH = /^(null|none|n a|na|unknown|not stated|not known|not available|not recorded|\?|-|–|—|0|unk)$/;
+      function isNullish(value) {
+        return NULLISH.test(normalizeLabel(value) || (value || "").trim());
+      }
+      function genderForText(text) {
+        var norm = normalizeLabel(text);
+        if (/^(m|male|man|mann|mand|homme|masculin|mannlich|maennlich|hombre|masculino|man|manlig|mannlig|jongen|son|boy)$/.test(norm)) return "Male";
+        if (/^(f|v|w|k|female|woman|vrouw|femme|feminin|weiblich|kvinne|kvinna|kvinde|mujer|femenino|kvinnlig|meisje|daughter|girl)$/.test(norm)) return "Female";
+        return null;
+      }
+      module.exports = {
+        fieldForLabel,
+        eventTypeForText,
+        genderForText,
+        isNullish,
+        normalizeLabel
+      };
+    }
+  });
+
+  // src/generic/labelvalue.js
+  var require_labelvalue = __commonJS({
+    "src/generic/labelvalue.js"(exports, module) {
+      var debug = require_browser()("genscrape:generic:labelvalue");
+      var labels = require_labels();
+      var dates = require_dates();
+      var SKIP = "script,style,noscript,template,nav,footer,form,select,option,input,textarea,button,svg,iframe";
+      var BLOCK = /^(address|article|aside|blockquote|dd|div|dl|dt|fieldset|figure|h[1-6]|header|hr|li|main|ol|p|pre|section|table|tbody|thead|tfoot|tr|td|th|ul|caption)$/;
+      function getText(el) {
+        var out = "";
+        (function walk(node) {
+          if (node.nodeType === 3) {
+            out += node.data;
+            return;
+          }
+          if (node.nodeType !== 1) return;
+          var tag = node.tagName.toLowerCase();
+          if (tag === "br") {
+            out += "\n";
+            return;
+          }
+          if (matches(node, SKIP)) return;
+          var block = BLOCK.test(tag);
+          if (block) out += "\n";
+          for (var c = node.firstChild; c; c = c.nextSibling) walk(c);
+          if (block) out += "\n";
+        })(el);
+        return out.replace(/[ \t ]+/g, " ").replace(/ *\n[\s]*/g, "\n").trim();
+      }
+      function oneLine(s) {
+        return (s || "").replace(/\s+/g, " ").trim();
+      }
+      function matches(el, selector) {
+        var fn = el.matches || el.webkitMatchesSelector || el.msMatchesSelector;
+        return !!(fn && fn.call(el, selector));
+      }
+      function closest(el, selector) {
+        for (; el && el.nodeType === 1; el = el.parentNode) {
+          if (matches(el, selector)) return el;
+        }
+        return null;
+      }
+      function skipped(el) {
+        return !!closest(el, SKIP);
+      }
+      function hasBlockChild(el) {
+        for (var i = 0; i < el.children.length; i++) {
+          if (BLOCK.test(el.children[i].tagName.toLowerCase())) return true;
+        }
+        return false;
+      }
+      function collectPairs(document2, root) {
+        var pairs = [], order = 0;
+        root = root || document2.body || document2.documentElement;
+        pairs.household = [];
+        function add(label, value, priority) {
+          label = oneLine(label).replace(/[:：]\s*$/, "");
+          value = (value || "").trim();
+          if (!label || !value || label.length > 50 || value.length > 600 || labels.isNullish(value)) return;
+          if (value.length < 40 && labels.fieldForLabel(value)) return;
+          var field = labels.fieldForLabel(label);
+          if (field) pairs.push({ field, label, value, priority, order: order++ });
+        }
+        Array.prototype.forEach.call(root.querySelectorAll("table"), function(table) {
+          if (skipped(table)) return;
+          var headerCells = Array.prototype.slice.call(table.querySelectorAll("thead th, thead td"));
+          var rows = Array.prototype.filter.call(table.querySelectorAll("tr"), function(tr) {
+            return !closest(tr, "thead");
+          });
+          if (!headerCells.length && rows.length > 1) {
+            var firstCells = Array.prototype.filter.call(rows[0].children, function(c) {
+              return /^(td|th)$/i.test(c.tagName);
+            });
+            if (firstCells.length > 2 && firstCells.every(function(c) {
+              return c.tagName.toLowerCase() === "th";
+            })) {
+              headerCells = firstCells;
+              rows = rows.slice(1);
+            }
+          }
+          var headers = headerCells.map(function(c) {
+            return oneLine(getText(c));
+          });
+          var mapped = headers.filter(function(h) {
+            return labels.fieldForLabel(h);
+          }).length;
+          if (headers.length < 3 || mapped < 2) return;
+          var data = rows.map(function(tr) {
+            return Array.prototype.filter.call(tr.children, function(c) {
+              return /^(td|th)$/i.test(c.tagName);
+            });
+          }).filter(function(cells) {
+            return Math.abs(cells.length - headers.length) <= 1;
+          });
+          if (!data.length) return;
+          var marked = data.filter(function(cells) {
+            var html = cells.map(function(c) {
+              return (c.getAttribute("class") || "") + " " + c.innerHTML;
+            }).join(" ").toLowerCase();
+            return /bold|semibold|highlight|selected|current|principal|primary|found in your search|<strong|<b>/.test(html);
+          });
+          var principal = marked.length === 1 ? marked[0] : data[0];
+          var cellText = function(c) {
+            var clone = c.cloneNode(true);
+            Array.prototype.forEach.call(clone.querySelectorAll(".accessibility,.sr-only,.visually-hidden"), function(x) {
+              x.parentNode.removeChild(x);
+            });
+            return oneLine(getText(clone));
+          };
+          headers.forEach(function(h, i) {
+            if (principal[i]) add(h, cellText(principal[i]), 0);
+          });
+          if (data.length > 1) {
+            data.forEach(function(cells) {
+              if (cells === principal) return;
+              var member = {};
+              headers.forEach(function(h, i) {
+                var f = labels.fieldForLabel(h);
+                if (f && cells[i] && member[f] === void 0) member[f] = cellText(cells[i]);
+              });
+              pairs.household.push(member);
+            });
+          }
+        });
+        Array.prototype.forEach.call(root.querySelectorAll("tr"), function(tr) {
+          if (skipped(tr)) return;
+          var cells = Array.prototype.filter.call(tr.children, function(c) {
+            return /^(td|th)$/i.test(c.tagName);
+          });
+          if (cells.length >= 2) {
+            add(getText(cells[0]), cells.slice(1).map(getText).filter(Boolean).join("\n"), 1);
+          }
+        });
+        Array.prototype.forEach.call(root.querySelectorAll("dt"), function(dt) {
+          if (skipped(dt)) return;
+          var values = [], sib = dt.nextElementSibling;
+          while (sib && sib.tagName.toLowerCase() === "dd") {
+            values.push(getText(sib));
+            sib = sib.nextElementSibling;
+          }
+          add(getText(dt), values.join("\n"), 1);
+        });
+        Array.prototype.forEach.call(root.querySelectorAll("[class]"), function(el) {
+          if (skipped(el)) return;
+          var cls = " " + (el.getAttribute("class") || "").toLowerCase().replace(/[-_]/g, " ") + " ";
+          if (/ (label|key|term|field label|data label|fact label|title) /.test(cls) && el.nextElementSibling && !hasBlockChild(el)) {
+            add(getText(el), getText(el.nextElementSibling), 2);
+          }
+        });
+        Array.prototype.forEach.call(root.querySelectorAll("p,li,div,span,td,dd"), function(el) {
+          if (skipped(el) || hasBlockChild(el)) return;
+          getText(el).split("\n").forEach(function(line) {
+            var m = /^\s*([^:\n]{2,40}?)\s*[:：]\s*(\S[^\n]*)$/.exec(line);
+            if (m) add(m[1], m[2], 3);
+          });
+        });
+        Array.prototype.forEach.call(root.querySelectorAll("b,strong,em,span,label,h2,h3,h4,h5,h6,dt,th,div"), function(el) {
+          if (skipped(el) || el.children.length > 1) return;
+          var t = oneLine(el.textContent);
+          if (!t || t.length > 40) return;
+          var sib = el.nextElementSibling, value = "";
+          if (sib) {
+            value = getText(sib);
+          } else if (el.nextSibling && el.nextSibling.nodeType === 3) {
+            value = el.nextSibling.data;
+          }
+          if (value && value.length < 300) add(t, value, 4);
+        });
+        var lines = getText(root).split("\n").map(oneLine).filter(Boolean);
+        lines.forEach(function(line, i) {
+          var label = line.replace(/\s*[:：]$/, "").replace(/^(children|child|parents|spouses?)\s+(of|with|by)\s+.*$/i, "$1");
+          if (label.length > 40 || /\d/.test(label)) return;
+          var field = labels.fieldForLabel(label);
+          if (!field || !lines[i + 1]) return;
+          if (LIST_FIELDS.test(field)) {
+            var values = [];
+            for (var j = i + 1; j < lines.length && j <= i + 15 && !isSectionLine(lines[j]); j++) values.push(lines[j]);
+            add(label, values.join("\n"), 4);
+          } else if (!isSectionLine(lines[i + 1])) {
+            add(label, lines[i + 1], 4);
+          }
+        });
+        lines.forEach(function(line) {
+          var m = EVENT_LINE.exec(line);
+          if (m && dates.findDate(m[2])) {
+            var word = m[1].toLowerCase().replace(/\.$/, "");
+            add(ABBREV[word] || word, m[2], 5);
+          }
+        });
+        lines.forEach(function(line) {
+          var d = dates.findDate(line);
+          if (!d || d.index > 3) return;
+          var m = /^\s*([^\d:]{3,30}?)\s*[:\-–]\s*(.*)$/.exec(line.substr(d.index + d.text.length));
+          if (!m || /^(son|daughter|spouse|wife|husband|father|mother|sibling|brother|sister)\b/i.test(m[1])) return;
+          var place = m[2].split(/,?\s*[♂♀]|\s+(?:with|to|and)\s+[A-Z]/)[0];
+          var who = /[♂♀]\s*(.+)$/.exec(m[2]);
+          if (/^child (birth|born)/i.test(m[1])) {
+            if (who) add("children", who[1], 5);
+            return;
+          }
+          add(m[1], d.text + " " + place, 5);
+          if (who && labels.fieldForLabel(m[1]) === "marriage") add("spouse", who[1], 5);
+        });
+        return pairs;
+      }
+      var HEAD = /^(head|hoofd|chef|hf|husfar|husbonde|husmor|hm)/;
+      var SPOUSE = /^(wife|husband|spouse|w|hu|echtgeno|epouse|epoux|kone|hustru|mann|ehefrau|ehemann)/;
+      var CHILD = /^(son|dau|daughter|child|s|d|sonn|datter|zoon|dochter|fils|fille|sohn|tochter|barn)/;
+      var PARENT = /^(father|mother|fader|moder|far|mor|vader|moeder)/;
+      function householdRole(mine, theirs) {
+        var meHead = !mine || HEAD.test(mine);
+        if (meHead) {
+          if (SPOUSE.test(theirs)) return "spouse";
+          if (CHILD.test(theirs)) return "child";
+          if (PARENT.test(theirs)) return "parent";
+          return null;
+        }
+        if (SPOUSE.test(mine)) {
+          if (HEAD.test(theirs)) return "spouse";
+          if (CHILD.test(theirs)) return "child";
+          return null;
+        }
+        if (CHILD.test(mine)) {
+          if (HEAD.test(theirs) || SPOUSE.test(theirs)) return "parent";
+        }
+        return null;
+      }
+      var LIST_FIELDS = /^(parents|spouse|children|father|mother)$/;
+      var SECTION_WORDS = /^(siblings?|half[ -]siblings?|brothers?|sisters?|brothers and sisters|grand ?parents|paternal|maternal|notes?|sources?|citations?|events?|timeline|biography|photos?|media|family|family members|relationships|research|comments|memorials?|flowers|see also|references|share|print|godson|goddaughter|neighbors|household|freres et soeurs|geschwister|broers en zussen|sosken|syskon)\b/i;
+      function isSectionLine(line) {
+        if (line.length > 40 || /\d/.test(line)) return false;
+        var label = line.replace(/\s*[:：]$/, "");
+        return SECTION_WORDS.test(label) || !!labels.fieldForLabel(label);
+      }
+      var EVENT_LINE = /^(born|birth|b\.|baptized|baptised|christened|bap\.|chr\.|died|deceased|death|d\.|buried|burial|bur\.|married|m\.|geboren|gestorben|gest\.|geb\.|ne|née|né|nee|decede|décédé|décédée|overleden|begraven|gedoopt|fodt|født|død|dod)\s+(.+)$/i;
+      var ABBREV = { "b": "born", "d": "died", "bap": "baptism", "chr": "baptism", "bur": "buried", "m": "married", "geb": "geboren", "gest": "gestorben" };
+      function bestPairs(pairs) {
+        var best = {};
+        pairs.forEach(function(p) {
+          var cur = best[p.field];
+          if (!cur || p.priority < cur.priority || p.priority === cur.priority && p.order < cur.order) {
+            best[p.field] = p;
+          }
+        });
+        return best;
+      }
+      var NAME_JUNK = /\s*(\(|\[|\b(b|d|born|died|geb|gest|ne|nee)\.?\s+\d|\s[-–—]\s|\s\d{3,4}\b|,\s*(born|died|b\.|d\.)).*$/i;
+      var PARTICLES = /^(van|von|de|der|den|du|la|le|da|di|del|della|dos|das|of|y|zu|ten|ter|vom|zum|and|et|und|en|af|av|bin|ibn|al|el|st|ste|mc|mac)$/i;
+      function looksLikeName(s, minWords) {
+        if (!s || labels.fieldForLabel(s)) return false;
+        if ((s.match(/,/g) || []).length > 1) return false;
+        var words = s.replace(/[,()"“”]/g, " ").split(/\s+/).filter(Boolean);
+        if (words.length < (minWords || 1) || words.length > 8) return false;
+        return words.every(function(w) {
+          return /^[A-ZÀ-ÞĀ-Ž]/.test(w) || PARTICLES.test(w.replace(/\.$/, "")) || /^[IVX]+$/.test(w);
+        }) && !words.some(function(w) {
+          return labels.fieldForLabel(w);
+        });
+      }
+      var NOT_A_NAME = /\b(record|records|register|search|results?|archives?|genealogy|family tree|database|view|index|transcriptions?|login|home|page|relationship|forenames?|marital|status|occupation|unknown|null)\b/i;
+      function cleanName(s) {
+        s = oneLine(s).replace(/^[A-Z][\w ]{1,20}:\s*(?=\S)/, "").replace(/^.*?\b(?:record|entry|profile|memorial) (?:for|of)\s+/i, "").replace(/^(?:married|mariee?|marie|x)\b.*?\b(?:to|with|avec|met|mit)\s+/i, "").replace(/^\d+\s+/, "").replace(NAME_JUNK, "").replace(/,\s*(?=[a-z]).*$/, "").replace(/\s+(?:ca|abt|about|circa|c|bef|aft)\.?$/i, "").replace(/([a-z.])[*+]?\d{1,2}\b/gi, "$1").replace(/[*+†✝]+/g, "").replace(/^[\s•·*\-–—♂♀⚭]+|[\s,;:•·*\-–—]+$/g, "");
+        return /[a-z]/i.test(s) && s.length <= 80 && !NOT_A_NAME.test(s) ? s : "";
+      }
+      function splitList(value) {
+        return value.split(/\n|;|\s+(?:and|&|og|en|et|und|och|y)\s+/i).map(cleanName).filter(function(n) {
+          return looksLikeName(n, 2);
+        });
+      }
+      function headingName(document2, url, root) {
+        var candidates = [];
+        var scoped = root && root !== document2.body && root.querySelector("h1,h2,h3");
+        if (scoped) candidates.push(oneLine(getText(scoped)));
+        var firstHeading = function(tag) {
+          return Array.prototype.filter.call(document2.querySelectorAll(tag), function(h) {
+            return !skipped(h);
+          })[0];
+        };
+        var h1 = firstHeading("h1");
+        if (h1) candidates.push(oneLine(getText(h1)));
+        var og = document2.querySelector('meta[property="og:title"]');
+        if (og) candidates.push(og.getAttribute("content") || "");
+        candidates.push((document2.title || "").split(/\s+[|\-–—:]\s+/)[0]);
+        var h2 = firstHeading("h2");
+        if (h2) candidates.push(oneLine(getText(h2)));
+        var site = (url || "").replace(/^https?:\/\/(www\.)?/, "").split(/[./]/)[0].toLowerCase();
+        for (var i = 0; i < candidates.length; i++) {
+          var n = cleanName(candidates[i]);
+          if (n && n.split(" ").length <= 8 && (!site || n.toLowerCase().replace(/\W/g, "").indexOf(site) === -1)) return n;
+        }
+        return "";
+      }
+      function event(rec, type) {
+        return rec.events[type] = rec.events[type] || { date: "", place: "" };
+      }
+      function setDatePlace(rec, type, combined, date, place) {
+        if (!combined && !date && !place) return;
+        var e = event(rec, type);
+        if (combined && !dates.findDate(combined) && (labels.genderForText(combined) || labels.fieldForLabel(combined) || /\b(relation|head|status|single|married|widow|unknown|yes|no)\b/i.test(combined))) {
+          combined = "";
+        }
+        if (combined) {
+          var split = dates.splitDatePlace(combined);
+          e.date = e.date || split.date;
+          e.place = e.place || split.place;
+        }
+        if (date) e.date = dates.findDate(date) ? oneLine(date) : e.date;
+        if (place) e.place = oneLine(place);
+      }
+      var PLACE_RANK = [
+        /church|parish|kirke|sogn|prestegjeld/,
+        /place|location|town|city|village|municipality|gemeente|commune|gemeinde|kommune|lieu|plaats|ort|sted|lugar/,
+        /district|area/,
+        /county|state|province/,
+        /country/
+      ];
+      function placeRank(label) {
+        var n = labels.normalizeLabel(label);
+        for (var i = 0; i < PLACE_RANK.length; i++) if (PLACE_RANK[i].test(n)) return i;
+        return 1;
+      }
+      function joinValues(pairs, field, priority, sep) {
+        var seen = {};
+        return pairs.filter(function(p) {
+          return p.field === field && p.priority === priority;
+        }).sort(function(a, b) {
+          return sep === ", " ? placeRank(a.label) - placeRank(b.label) || a.order - b.order : a.order - b.order;
+        }).map(function(p) {
+          return sep === ", " ? oneLine(p.value) : p.value;
+        }).filter(function(v) {
+          var k = v.toLowerCase();
+          if (seen[k]) return false;
+          seen[k] = true;
+          return true;
+        }).join(sep);
+      }
+      function extract(document2, url, root) {
+        var pairs = collectPairs(document2, root);
+        var best = bestPairs(pairs);
+        ["place", "birthPlace", "deathPlace", "baptismPlace", "marriagePlace"].forEach(function(f) {
+          if (best[f]) best[f].value = joinValues(pairs, f, best[f].priority, ", ");
+        });
+        ["children", "spouse"].forEach(function(f) {
+          if (best[f]) best[f].value = joinValues(pairs, f, best[f].priority, "\n");
+        });
+        var v = function(f) {
+          return best[f] ? best[f].value : "";
+        };
+        var fields = Object.keys(best);
+        debug("fields", fields.join(","));
+        var rec = { name: {}, gender: null, events: {}, relatives: [] };
+        rec.name.given = oneLine(v("given"));
+        rec.name.surname = oneLine(v("surname"));
+        var groom = oneLine(v("groom")) || oneLine([v("groomGiven"), v("groomSurname")].join(" "));
+        var bride = oneLine(v("bride")) || oneLine([v("brideGiven"), v("brideSurname")].join(" "));
+        if (groom && !rec.name.given && !rec.name.surname && !v("name")) {
+          if (v("groomGiven") || v("groomSurname")) {
+            rec.name.given = oneLine(v("groomGiven"));
+            rec.name.surname = oneLine(v("groomSurname"));
+          } else {
+            rec.name.full = cleanName(groom);
+          }
+          rec.gender = "Male";
+        }
+        rec.name.full = cleanName(v("name")) || (rec.name.given || rec.name.surname ? "" : headingName(document2, url, root));
+        rec.gender = labels.genderForText(oneLine(v("gender"))) || rec.gender;
+        if (v("maritalStatus")) rec.events.MaritalStatus = { value: oneLine(v("maritalStatus")) };
+        setDatePlace(rec, "Birth", v("birth"), v("birthDate"), v("birthPlace"));
+        setDatePlace(rec, "Baptism", v("baptism"), v("baptismDate"), v("baptismPlace"));
+        setDatePlace(rec, "Death", v("death"), v("deathDate"), v("deathPlace"));
+        setDatePlace(rec, "Burial", v("burial"), v("burialDate"), v("cemetery"));
+        setDatePlace(rec, "Marriage", v("marriage"), v("marriageDate"), v("marriagePlace"));
+        if (v("residence")) event(rec, "Residence").place = oneLine(v("residence"));
+        if (v("occupation")) rec.events.Occupation = { value: oneLine(v("occupation")) };
+        if (v("deathCause") && rec.events.Death) rec.events.Death.value = oneLine(v("deathCause"));
+        var service = ["rank", "unit", "serviceNumber", "conflict"].map(v).map(oneLine).filter(Boolean);
+        if (service.length) rec.events.MilitaryService = { value: service.join(", ") };
+        var generic = labels.eventTypeForText(v("eventType"));
+        if (!generic && (v("date") || v("place"))) {
+          var found = Object.keys(rec.events).filter(function(k) {
+            return /Birth|Baptism|Death|Burial|Marriage/.test(k);
+          });
+          generic = found.length === 1 ? found[0] : null;
+        }
+        if (generic) {
+          var e = event(rec, generic);
+          if (!e.date && v("date")) e.date = (dates.findDate(v("date")) || {}).text || "";
+          if (!e.place && v("place")) e.place = oneLine(v("place"));
+        }
+        var father = cleanName(v("father")) || oneLine([v("fatherGiven"), v("fatherSurname") || (v("fatherGiven") ? rec.name.surname : "")].join(" "));
+        var mother = cleanName(v("mother")) || oneLine([v("motherGiven"), v("motherSurname") || v("motherMaiden")].join(" "));
+        if (rec.name.given && !rec.name.surname && !rec.name.full && v("fatherSurname")) rec.name.surname = oneLine(v("fatherSurname"));
+        if (father) rec.relatives.push({ role: "parent", name: father, gender: "Male" });
+        if (mother) rec.relatives.push({ role: "parent", name: mother, gender: "Female" });
+        if (!father && !mother && v("parents")) {
+          splitList(v("parents")).slice(0, 2).forEach(function(n) {
+            rec.relatives.push({ role: "parent", name: n });
+          });
+        }
+        if (groom && bride) rec.relatives.push({ role: "spouse", name: cleanName(bride) || bride, gender: "Female" });
+        splitList(v("spouse")).forEach(function(n) {
+          rec.relatives.push({ role: "spouse", name: n });
+        });
+        splitList(v("children")).forEach(function(n) {
+          rec.relatives.push({ role: "child", name: n });
+        });
+        if (v("censusYear") || generic === "Census") {
+          var c = event(rec, "Census");
+          c.date = c.date || ((dates.findDate(v("censusYear")) || {}).text || "");
+          c.place = c.place || oneLine(v("place"));
+        }
+        var age = parseInt(oneLine(v("age")), 10);
+        var dated = ["Census", "Death", "Burial"].map(function(k) {
+          return rec.events[k];
+        }).filter(function(e2) {
+          return e2 && e2.date;
+        })[0];
+        if (age >= 0 && age < 120 && dated && !(rec.events.Birth && rec.events.Birth.date)) {
+          var year = (dates.parseDateParts(dated.date).years || [])[0];
+          if (year) event(rec, "Birth").date = "about " + (year - age);
+        }
+        var myRel = labels.normalizeLabel(v("relationToHead"));
+        pairs.household.forEach(function(m) {
+          var name = oneLine([m.given, m.surname].join(" ")) || cleanName(m.name || "");
+          var rel = labels.normalizeLabel(m.relationToHead || "");
+          if (!name || !rel) return;
+          var role = householdRole(myRel, rel);
+          if (role) rec.relatives.push({ role, name, gender: labels.genderForText(m.gender || "") });
+        });
+        Object.keys(rec.events).forEach(function(k) {
+          var e2 = rec.events[k];
+          if (!e2.date && !e2.place && !e2.value) delete rec.events[k];
+        });
+        var hasName = rec.name.full || rec.name.given || rec.name.surname;
+        var substance = Object.keys(rec.events).length + rec.relatives.length + (rec.gender ? 1 : 0);
+        if (!hasName || substance === 0) return null;
+        return { record: rec, strategy: "labels", fields: fields.length };
+      }
+      module.exports = { extract, collectPairs, getText };
+    }
+  });
+
+  // src/generic/embedded-json.js
+  var require_embedded_json = __commonJS({
+    "src/generic/embedded-json.js"(exports, module) {
+      var labels = require_labels();
+      var dates = require_dates();
+      var STATE_RE = /(?:window\.)?(?:__[A-Z_]+__|__NEXT_DATA__|initialState|INITIAL_STATE)\s*=\s*(\{[\s\S]*?\});?\s*(?:<\/script>|$|\n)/;
+      function keyToLabel(key) {
+        return key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/[_\-]+/g, " ");
+      }
+      function parseScripts(document2) {
+        var roots = [];
+        Array.prototype.forEach.call(document2.querySelectorAll("script"), function(s) {
+          var type = (s.getAttribute("type") || "").toLowerCase();
+          var txt = s.textContent || "";
+          if (type === "application/ld+json") return;
+          try {
+            if (type === "application/json") {
+              txt = txt.trim();
+              if (/^[A-Za-z0-9+\/=\s]{40,}$/.test(txt) && txt.charAt(0) !== "{") {
+                var win = document2.defaultView || {};
+                txt = decodeURIComponent(escape((win.atob || atob)(txt.replace(/\s+/g, ""))));
+              }
+              roots.push(JSON.parse(txt));
+              return;
+            }
+            var m = STATE_RE.exec(txt);
+            if (m) roots.push(JSON.parse(m[1]));
+          } catch (e) {
+          }
+        });
+        return roots;
+      }
+      function scalar(v) {
+        if (v === null || v === void 0) return "";
+        if (typeof v === "object") {
+          if (v.year) return [v.day, v.month, v.year].filter(Boolean).join(" ");
+          return scalar(v.text || v.name || v.value || v.display || v.original || "");
+        }
+        return String(v).replace(/\s+/g, " ").trim();
+      }
+      function mapObject(obj) {
+        var out = {};
+        Object.keys(obj).forEach(function(k) {
+          var v = obj[k];
+          if (v === null || v === "" || typeof v === "string" && labels.normalizeLabel(v) === labels.normalizeLabel(k)) return;
+          if (typeof v === "string" && labels.isNullish(v)) return;
+          var f = labels.fieldForLabel(keyToLabel(k));
+          if (!f) return;
+          if (out[f] === void 0 || typeof v !== "object" && scalar(v).length > scalar(out[f]).length) {
+            out[f] = v;
+            out["_key_" + f] = k;
+          }
+        });
+        return out;
+      }
+      function nameOf(obj) {
+        var m = mapObject(obj);
+        var full = scalar(m.name);
+        var parts = [scalar(m.given), scalar(m.surname)].join(" ").trim();
+        return parts || full;
+      }
+      function withRegion(obj, key, place) {
+        if (!key || !place) return place;
+        var prefix = key.replace(/([_\-]?(name|place|location))$/i, "");
+        if (prefix === key) return place;
+        var parts = [place];
+        ["city", "town", "county", "state", "province", "region", "country"].forEach(function(s) {
+          Object.keys(obj).forEach(function(k) {
+            if (k.toLowerCase().replace(/[_\-]/g, "") === (prefix + s).toLowerCase().replace(/[_\-]/g, "")) {
+              var v = scalar(obj[k]);
+              if (v && parts.indexOf(v) === -1) parts.push(v);
+            }
+          });
+        });
+        return parts.join(", ");
+      }
+      function extract(document2, url, root) {
+        var best = null, bestScore = 2;
+        var seen = 0;
+        function walk(node, depth) {
+          if (!node || typeof node !== "object" || depth > 25 || seen++ > 5e4) return;
+          if (Array.isArray(node)) {
+            node.forEach(function(n) {
+              walk(n, depth + 1);
+            });
+            return;
+          }
+          var m2 = mapObject(node);
+          var hasName = m2.name !== void 0 || m2.given !== void 0 || m2.surname !== void 0;
+          var score = Object.keys(m2).length;
+          if (hasName && score > bestScore && nameOf(node)) {
+            best = node;
+            bestScore = score;
+          }
+          Object.keys(node).forEach(function(k) {
+            walk(node[k], depth + 1);
+          });
+        }
+        parseScripts(document2).forEach(function(r) {
+          walk(r, 0);
+        });
+        if (!best) return null;
+        var m = mapObject(best);
+        var rec = {
+          name: { given: scalar(m.given), surname: scalar(m.surname), full: scalar(m.name) },
+          gender: labels.genderForText(scalar(m.gender)),
+          events: {},
+          relatives: []
+        };
+        if (rec.name.given || rec.name.surname) rec.name.full = "";
+        [
+          ["Birth", "birth", "birthDate", "birthPlace"],
+          ["Baptism", "baptism", "baptismDate", "baptismPlace"],
+          ["Death", "death", "deathDate", "deathPlace"],
+          ["Burial", "burial", "burialDate", "cemetery"],
+          ["Marriage", "marriage", "marriageDate", "marriagePlace"]
+        ].forEach(function(e) {
+          var combined = scalar(m[e[1]]), date = scalar(m[e[2]]), place = withRegion(best, m["_key_" + e[3]], scalar(m[e[3]]));
+          if (combined && !date && !place) {
+            var split = dates.splitDatePlace(combined);
+            date = split.date;
+            place = split.place;
+          }
+          if (date || place) rec.events[e[0]] = { date, place };
+        });
+        [["parent", "parents"], ["parent", "father"], ["parent", "mother"], ["spouse", "spouse"], ["child", "children"]].forEach(function(r) {
+          var v = m[r[1]];
+          (Array.isArray(v) ? v : v ? [v] : []).forEach(function(rel) {
+            var n = typeof rel === "object" ? nameOf(rel) : scalar(rel);
+            if (n) rec.relatives.push({ role: r[0], name: n });
+          });
+        });
+        return { record: rec, strategy: "json" };
+      }
+      module.exports = { extract };
+    }
+  });
+
+  // src/generic/narrative.js
+  var require_narrative = __commonJS({
+    "src/generic/narrative.js"(exports, module) {
+      var dates = require_dates();
+      var NAME = "([A-Z][\\w'\u2019.\\-]*(?:\\s+(?:(?:van|von|de|der|den|du|la|le|da|di|of|y|zu|ten|ter)\\s+)*[A-Z][\\w'\u2019.\\-]*){0,6})";
+      var EVENTS = [
+        ["Birth", /\b(?:was born|born|b\.|né|née|geboren|ble født|föddes)\s+/i],
+        ["Baptism", /\b(?:was (?:baptized|baptised|christened)|baptized|baptised|christened|bap\.|chr\.|gedoopt|getauft)\s+/i],
+        ["Death", /\b(?:died|d\.|décédée?|gestorben|overleden|døde|dog)\s+/i],
+        ["Burial", /\b(?:was buried|buried|bur\.|inhumée?|begraben|begraven)\s+/i]
+      ];
+      function firstSentenceMatch(text, re) {
+        var m = re.exec(text);
+        if (!m) return null;
+        var rest = text.substr(m.index + m[0].length, 160).split(/(?:\.\s+(?=[A-Z])|;|\n|\.$)/)[0];
+        rest = rest.split(/,\s*(?:b|d|bap|chr|bur|m)\.\s/)[0];
+        return rest;
+      }
+      function extract(document2, text) {
+        var rec = { name: {}, gender: null, events: {}, relatives: [] };
+        text = text.replace(/\[\d+\]/g, "").replace(/([a-zA-Z.])\d{1,2}(?=\s|$)/gm, "$1");
+        EVENTS.forEach(function(e) {
+          var rest = firstSentenceMatch(text, e[1]);
+          if (!rest) return;
+          var split = dates.splitDatePlace(rest);
+          if (split.date) {
+            rec.events[e[0]] = { date: split.date, place: split.place.split(/\s+(?:to|and|with|by|son|daughter)\s+/)[0] };
+          }
+        });
+        var m;
+        var parents = new RegExp("\\b([Ss]on|[Dd]aughter|[Cc]hild|[Ff]ils|[Ff]ille|[Ss]ohn|[Tt]ochter|[Zz]oon|[Dd]ochter)\\s+(?:of|de|du|von|van)\\s+" + NAME + "(?:\\s+(?:and|et|und|en|&)\\s+" + NAME + ")?").exec(text);
+        if (parents) {
+          rec.gender = /son|fils|sohn|zoon/i.test(parents[1]) ? "Male" : "Female";
+          var father = parents[2], mother = parents[3];
+          if (mother && father.split(/\s+/).length === 1 && mother.split(/\s+/).length > 1) {
+            father += " " + mother.split(/\s+/).pop();
+          }
+          rec.relatives.push({ role: "parent", name: father, gender: "Male" });
+          if (mother) rec.relatives.push({ role: "parent", name: mother, gender: "Female" });
+        }
+        if (m = new RegExp("\\b([Hh]usband|[Ww]ife|[Ww]idow|[Ww]idower|\xE9pou(?:x|se)|ehemann|ehefrau|echtgeno(?:ot|te))\\s+of\\s+" + NAME).exec(text)) {
+          rec.relatives.push({ role: "spouse", name: m[2] });
+          rec.gender = rec.gender || (/husband|widower|époux|ehemann|echtgenoot/i.test(m[1]) ? "Male" : "Female");
+        } else {
+          var marriedRe = new RegExp("\\b(?:He|She)\\s+married\\s+" + NAME + "([^.;\\n]{0,120})", "g");
+          while (m = marriedRe.exec(text)) {
+            rec.relatives.push({ role: "spouse", name: m[1] });
+            var md = dates.splitDatePlace((m[2] || "").replace(/^,[^,]*,/, ""));
+            if (md.date && !rec.events.Marriage) rec.events.Marriage = { date: md.date, place: md.place.replace(/^.*?\b(?:at|in)\s+/, "") };
+          }
+        }
+        if (m = /\b(?:[Ff]ather|[Mm]other|[Pp]arent|[Pp]ère|[Mm]ère|[Vv]ater|[Mm]utter|[Vv]ader|[Mm]oeder)\s+(?:of|de|von|van)\s+([^\n]+)/.exec(text)) {
+          m[1].split(/;|\s+and\s+|\s+et\s+|\s+und\s+|\s+en\s+/).forEach(function(n) {
+            n = n.replace(/,.*$/, "").trim();
+            var nm = new RegExp("^" + NAME + "$").exec(n);
+            if (nm) rec.relatives.push({ role: "child", name: nm[1] });
+          });
+          rec.gender = rec.gender || (/^[FPVfpv]/.test(m[0]) && !/^[Pp]arent/.test(m[0]) ? "Male" : "Female");
+        }
+        if (!rec.gender) {
+          var he = (text.match(/\b(He|His|Him)\b/g) || []).length, she = (text.match(/\b(She|Her|Hers)\b/g) || []).length;
+          if (he >= 2 && he > she * 2) rec.gender = "Male";
+          else if (she >= 2 && she > he * 2) rec.gender = "Female";
+        }
+        var substance = Object.keys(rec.events).length + rec.relatives.length;
+        return substance ? { record: rec, strategy: "narrative" } : null;
+      }
+      module.exports = { extract };
+    }
+  });
+
   // src/gedx-extensions.js
   var require_gedx_extensions = __commonJS({
     "src/gedx-extensions.js"() {
@@ -6298,6 +7377,178 @@ var genscrape = (() => {
           });
         }
       };
+    }
+  });
+
+  // src/generic/index.js
+  var require_generic = __commonJS({
+    "src/generic/index.js"(exports, module) {
+      var debug = require_browser()("genscrape:generic");
+      var GedcomX = require_src();
+      var utils = require_utils2();
+      var structured = require_structured();
+      var labelvalue = require_labelvalue();
+      var embeddedJson = require_embedded_json();
+      var narrative = require_narrative();
+      var dates = require_dates();
+      require_gedx_extensions();
+      function merge(base, extra) {
+        if (!base) return extra;
+        ["full", "given", "surname"].forEach(function(k) {
+          if (!base.name.full && !base.name.given && extra.name[k]) base.name[k] = extra.name[k];
+        });
+        base.gender = base.gender || extra.gender;
+        Object.keys(extra.events).forEach(function(type) {
+          var b = base.events[type], e = extra.events[type];
+          if (!b) {
+            base.events[type] = e;
+            return;
+          }
+          b.date = precision(e.date) > precision(b.date) ? e.date : b.date;
+          b.place = b.place || e.place;
+          b.value = b.value || e.value;
+        });
+        var have = base.relatives.map(function(r) {
+          return r.role + "|" + r.name.toLowerCase();
+        });
+        extra.relatives.forEach(function(r) {
+          if (have.indexOf(r.role + "|" + r.name.toLowerCase()) === -1) base.relatives.push(r);
+        });
+        return base;
+      }
+      function precision(date) {
+        if (!date || /u{2}/i.test(date)) return 0;
+        var p = dates.parseDateParts(date);
+        return (p.years.length ? 1 : 0) + (p.month ? 1 : 0) + (p.day ? 1 : 0);
+      }
+      function recordId(url) {
+        var params = url.indexOf("?") === -1 ? {} : utils.getQueryParams(url.split("#")[0]);
+        var id = params.id || params.record_id || params.pid || params.grave || params.p || params.i;
+        if (id) return String(id);
+        var path = url.split(/[?#]/)[0].split("/").filter(Boolean);
+        for (var i = path.length - 1; i >= 0; i--) {
+          if (/\d/.test(path[i])) return path[i].replace(/\.\w+$/, "");
+        }
+        return path.pop() || "unknown";
+      }
+      function makePerson(gedx, name, gender) {
+        var person = GedcomX.Person({ id: gedx.generateId() });
+        if (typeof name === "string") {
+          person.addSimpleName(name);
+        } else if (name.given || name.surname) {
+          person.addNameFromParts({
+            "http://gedcomx.org/Given": name.given,
+            "http://gedcomx.org/Surname": name.surname
+          });
+        } else {
+          person.addSimpleName(name.full);
+        }
+        if (gender) person.setGender({ type: "http://gedcomx.org/" + gender });
+        return person;
+      }
+      function toGedcomX(rec, document2, url) {
+        var gedx = GedcomX(), host = url.replace(/^https?:\/\//, "").split("/")[0].replace(/^www\./, ""), id = recordId(url);
+        var principal = makePerson(gedx, rec.name, rec.gender);
+        principal.setId(id);
+        principal.setPrincipal(true);
+        principal.setIdentifiers({ genscrape: "genscrape://" + host + "/" + id });
+        Object.keys(rec.events).forEach(function(type) {
+          var e = rec.events[type];
+          if (type === "Marriage" && rec.relatives.some(function(r) {
+            return r.role === "spouse";
+          })) return;
+          var fact = GedcomX.Fact({ type: "http://gedcomx.org/" + type });
+          if (e.date) fact.setDate({ original: e.date });
+          if (e.place) fact.setPlace({ original: e.place });
+          if (e.value) fact.setValue(e.value);
+          principal.addFact(fact);
+        });
+        gedx.addPerson(principal);
+        var spouseCount = 0;
+        rec.relatives.forEach(function(r) {
+          var rel = makePerson(gedx, r.name, r.gender);
+          gedx.addPerson(rel);
+          if (r.role === "spouse") {
+            var couple = GedcomX.Relationship({ type: "http://gedcomx.org/Couple", person1: principal, person2: rel });
+            if (rec.events.Marriage && spouseCount++ === 0) {
+              couple.addFact(GedcomX.Fact({
+                type: "http://gedcomx.org/Marriage",
+                date: rec.events.Marriage.date ? { original: rec.events.Marriage.date } : void 0,
+                place: rec.events.Marriage.place ? { original: rec.events.Marriage.place } : void 0
+              }));
+            }
+            gedx.addRelationship(couple);
+          } else {
+            gedx.addRelationship({
+              type: "http://gedcomx.org/ParentChild",
+              person1: r.role === "parent" ? rel : principal,
+              person2: r.role === "parent" ? principal : rel
+            });
+          }
+        });
+        gedx.addAgent(GedcomX.Agent().setId("agent").addName({ lang: "en", value: host }).setHomepage({ resource: url.split("/").slice(0, 3).join("/") }));
+        gedx.addSourceDescriptionToAll({
+          about: url,
+          titles: [{ value: document2.title }],
+          citations: [{ value: document2.title + " (" + url + " : accessed " + utils.getDateString() + ")" }],
+          repository: { resource: "#agent" }
+        });
+        return gedx;
+      }
+      function anchorScope(document2, url) {
+        var hash = (url.split("#")[1] || "").trim();
+        if (!hash || !/\w/.test(hash)) return null;
+        var anchor = document2.getElementById(hash) || document2.querySelector('a[name="' + hash.replace(/"/g, "") + '"]');
+        if (!anchor) return null;
+        var shape = new RegExp("^" + hash.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\d+/g, "\\d+") + "$");
+        var isAnchor = function(el) {
+          return el.nodeType === 1 && (el.id && shape.test(el.id) || el.getAttribute("name") && shape.test(el.getAttribute("name")));
+        };
+        var containsOther = function(el) {
+          if (el.nodeType !== 1) return false;
+          if (isAnchor(el) && el !== anchor) return true;
+          return Array.prototype.some.call(el.querySelectorAll("[id],a[name]"), function(x) {
+            return x !== anchor && isAnchor(x);
+          });
+        };
+        var start = anchor;
+        while (start.parentNode && start.parentNode.nodeType === 1 && !containsOther(start.parentNode)) start = start.parentNode;
+        if (!start.parentNode || start.parentNode.nodeType !== 1) return null;
+        var scope = document2.createElement("div");
+        for (var n = start; n && !(n !== start && containsOther(n)); n = n.nextSibling) {
+          scope.appendChild(n.cloneNode(true));
+        }
+        return scope;
+      }
+      function extract(document2, url) {
+        var strategies = [];
+        var record = null;
+        var root = anchorScope(document2, url) || document2.body || document2.documentElement;
+        var text = labelvalue.getText(root);
+        [structured, embeddedJson, labelvalue, narrative].forEach(function(s) {
+          var result = s === narrative ? s.extract(document2, text) : s.extract(document2, url, root);
+          if (result) {
+            strategies.push(result.strategy);
+            record = merge(record, result.record);
+          }
+        });
+        debug("strategies", strategies.join("+") || "none");
+        if (!record) return null;
+        return {
+          gedx: toGedcomX(record, document2, url),
+          strategy: strategies.join("+"),
+          record
+        };
+      }
+      function isUsable(record) {
+        if (!record || !record.name) return false;
+        var hasName = !!(record.name.full || record.name.given || record.name.surname);
+        var events = Object.keys(record.events || {}).filter(function(k) {
+          return record.events[k].date;
+        });
+        return hasName && (events.length > 0 || (record.relatives || []).length > 0);
+      }
+      module.exports = { extract, isUsable };
     }
   });
 
@@ -6864,11 +8115,11 @@ var genscrape = (() => {
               emitter.emit("noData");
               return;
             }
-            process(emitter, parseHTML(json.html.body));
+            process2(emitter, parseHTML(json.html.body));
           }
         });
       }
-      function process(emitter, $dom) {
+      function process2(emitter, $dom) {
         debug("processing");
         var gedx = new GedcomX(), primaryPerson = new GedcomX.Person({
           id: getRecordId(window.location.href),
@@ -10210,13 +11461,13 @@ var genscrape = (() => {
                 debug("error");
                 emitter.emit("error", error2);
               } else {
-                process(emitter, treeId, personId, parseHTML(pageHtml), parseHTML(eventHtml));
+                process2(emitter, treeId, personId, parseHTML(pageHtml), parseHTML(eventHtml));
               }
             });
           }
         });
       }
-      function process(emitter, treeId, personId, $page, $event) {
+      function process2(emitter, treeId, personId, $page, $event) {
         debug("processing");
         var gedx = new GedcomX();
         var primaryPerson = new GedcomX.Person({
@@ -10393,12 +11644,4042 @@ var genscrape = (() => {
     }
   });
 
+  // src/scrapers/fold3-memorial.js
+  var require_fold3_memorial = __commonJS({
+    "src/scrapers/fold3-memorial.js"(exports, module) {
+      var debug = require_browser()("genscrape:scrapers:fold3-memorial");
+      var utils = require_utils2();
+      var GedcomX = require_src();
+      var urls = [
+        utils.urlPatternToRegex("https://www.fold3.com/memorial/*"),
+        utils.urlPatternToRegex("https://fold3.com/memorial/*")
+      ];
+      module.exports = function(register) {
+        register(urls, run);
+      };
+      var eventTypes = {
+        "birth": "http://gedcomx.org/Birth",
+        "death": "http://gedcomx.org/Death",
+        "burial": "http://gedcomx.org/Burial",
+        "marriage": "http://gedcomx.org/Marriage",
+        "divorce": "http://gedcomx.org/Divorce",
+        "baptism": "http://gedcomx.org/Baptism",
+        "christening": "http://gedcomx.org/Christening",
+        "residence": "http://gedcomx.org/Residence",
+        "immigration": "http://gedcomx.org/Immigration",
+        "emigration": "http://gedcomx.org/Emigration",
+        "naturalization": "http://gedcomx.org/Naturalization",
+        "cremation": "http://gedcomx.org/Cremation",
+        "census": "http://gedcomx.org/Census",
+        "occupation": "http://gedcomx.org/Occupation",
+        "education": "http://gedcomx.org/Education"
+      };
+      function run(emitter) {
+        debug("run");
+        var $name = document.querySelector("h1.page-title"), $events = document.querySelectorAll(".StoryPageEvent");
+        if (!$name || !$events.length) {
+          return emitter.emit("noData");
+        }
+        var id = getRecordId(document.location.href), gedx = new GedcomX(), person = GedcomX.Person({
+          id,
+          principal: true,
+          identifiers: {
+            "genscrape": "genscrape://fold3-memorial/" + id
+          }
+        }), names = [], relatives = [], servicePieces = {}, awards = [];
+        var primaryName = text($name);
+        person.addSimpleName(primaryName);
+        names.push(primaryName);
+        var $timeline = document.querySelector(".StoryPageEventsSection");
+        Array.prototype.forEach.call($events, function($event) {
+          var inTimeline = $timeline && $timeline.contains($event);
+          if (inTimeline) {
+            if ($event.classList.contains("military-service-event")) {
+              readMilitary($event, servicePieces, awards);
+            } else {
+              readTimelineEvent($event, person);
+            }
+          } else {
+            readOtherFacts($event, person, names, relatives);
+          }
+        });
+        var service = buildMilitaryService(servicePieces);
+        if (service) {
+          person.addFact(service);
+        }
+        awards.forEach(function(award) {
+          person.addFact({
+            type: "http://gedcomx.org/MilitaryAward",
+            value: award
+          });
+        });
+        gedx.addPerson(person);
+        relatives.forEach(function(rel) {
+          gedx.addRelativeFromName(person, rel.name, rel.type);
+        });
+        gedx.addAgent(GedcomX.Agent().setId("agent").addName({
+          lang: "en",
+          value: "Fold3"
+        }).setHomepage({
+          resource: "https://www.fold3.com"
+        }));
+        var title = document.title.replace(/\s*-\s*Fold3\s*$/, "") + " - Fold3 Memorial";
+        gedx.addSourceDescriptionToAll({
+          about: document.location.href,
+          titles: [
+            {
+              value: title
+            }
+          ],
+          citations: [
+            {
+              value: 'Fold3, "' + primaryName + '" (' + document.location.href + " : accessed " + utils.getDateString() + "), memorial page."
+            }
+          ],
+          repository: {
+            resource: "#agent"
+          }
+        });
+        emitter.emit("data", gedx);
+      }
+      function text($el) {
+        return $el ? $el.textContent.replace(/\s+/g, " ").trim() : "";
+      }
+      function readFact($fact) {
+        var $value = $fact.querySelector(".fact-value");
+        if (!$value) {
+          return null;
+        }
+        var $inlineLabel = null, $children = $value.children;
+        if ($children.length >= 2 && $children[0].classList.contains("text-uppercase") && $children[0].tagName === "DIV") {
+          return {
+            label: text($children[0]),
+            value: text($children[1])
+          };
+        }
+        if ($children.length && $children[0].tagName === "SPAN" && $children[0].classList.contains("text-uppercase")) {
+          var date = $children[1] ? text($children[1].querySelector("span") || $children[1]) : "";
+          return {
+            label: text($children[0]),
+            date
+          };
+        }
+        return {
+          value: text($value)
+        };
+      }
+      function readTimelineEvent($event, person) {
+        var label, date, values = [], labeled = {};
+        var $label = $event.querySelector("h3.event-label .text-uppercase");
+        if ($label) {
+          label = text($label);
+        }
+        Array.prototype.forEach.call($event.querySelectorAll(".StoryPageFact"), function($fact) {
+          var fact2 = readFact($fact);
+          if (!fact2) {
+            return;
+          }
+          if (fact2.label && fact2.date !== void 0 && !label) {
+            label = fact2.label;
+            date = fact2.date;
+          } else if (fact2.label) {
+            labeled[fact2.label.toLowerCase()] = fact2.value;
+          } else if (fact2.value) {
+            values.push(fact2.value);
+          }
+        });
+        var type = label && eventTypes[label.toLowerCase()];
+        if (!type) {
+          return;
+        }
+        var place;
+        switch (type) {
+          case "http://gedcomx.org/Burial":
+            place = burialPlace(values);
+            break;
+          case "http://gedcomx.org/Death":
+            place = choosePlace(values);
+            break;
+          default:
+            place = values[0];
+        }
+        var fact = GedcomX.Fact({ type });
+        if (date) {
+          fact.setDate({ original: date });
+        }
+        if (place) {
+          fact.setPlace({ original: place });
+        }
+        if (date || place) {
+          person.addFact(fact);
+        }
+      }
+      function choosePlace(values) {
+        for (var i = 0; i < values.length; i++) {
+          if (values[i].indexOf(",") !== -1) {
+            return values[i];
+          }
+        }
+        return values[0];
+      }
+      function burialPlace(values) {
+        var candidates = values.filter(function(v) {
+          return !/^(Buried at:|Missing in Action)/i.test(v);
+        });
+        if (candidates.length <= 1) {
+          return candidates[0] || values[0];
+        }
+        var locality = choosePlace(candidates), cemetery = candidates.filter(function(v) {
+          return v !== locality;
+        })[0];
+        return cemetery + ", " + locality;
+      }
+      function readMilitary($event, pieces, awards) {
+        var $start = $event.querySelector('[itemprop="startDate"]'), $end = $event.querySelector('[itemprop="endDate"]'), $war = $event.querySelector('h3 [itemprop="name"]');
+        if ($start) {
+          pieces.start = text($start);
+        }
+        if ($end) {
+          pieces.end = text($end);
+        }
+        if ($war) {
+          pieces.war = text($war);
+        }
+        Array.prototype.forEach.call($event.querySelectorAll(".StoryPageFact"), function($fact) {
+          var fact = readFact($fact);
+          if (!fact || !fact.label || !fact.value) {
+            return;
+          }
+          var label = fact.label.toLowerCase();
+          switch (label) {
+            case "rank":
+            case "regiment":
+            case "unit":
+            case "branch":
+            case "service number":
+            case "served for":
+              if (!pieces[label]) {
+                pieces[label] = fact.value;
+              }
+              break;
+            case "award":
+            case "awards":
+              fact.value.split(/\s*,\s*(?=[A-Z])/).forEach(function(award) {
+                if (award && awards.indexOf(award) === -1) {
+                  awards.push(award);
+                }
+              });
+              break;
+          }
+        });
+      }
+      function buildMilitaryService(pieces) {
+        var parts = [];
+        if (pieces.war) {
+          parts.push(pieces.war);
+        }
+        if (pieces.rank) {
+          parts.push(pieces.rank);
+        }
+        if (pieces.regiment || pieces.unit) {
+          parts.push(pieces.regiment || pieces.unit);
+        }
+        if (pieces.branch) {
+          parts.push(pieces.branch);
+        }
+        if (pieces["service number"]) {
+          parts.push("Service number " + pieces["service number"]);
+        }
+        if (!parts.length && !pieces.war) {
+          return null;
+        }
+        var fact = GedcomX.Fact({
+          type: "http://gedcomx.org/MilitaryService",
+          value: parts.join("; ")
+        });
+        var date = pieces.start && pieces.end ? pieces.start + " - " + pieces.end : pieces.start;
+        if (date) {
+          fact.setDate({ original: date });
+        }
+        return fact;
+      }
+      function readOtherFacts($event, person, names, relatives) {
+        Array.prototype.forEach.call($event.querySelectorAll(".StoryPageFact"), function($fact) {
+          var fact = readFact($fact);
+          if (!fact || !fact.label || !fact.value) {
+            return;
+          }
+          var value = fact.value;
+          switch (fact.label.toLowerCase()) {
+            case "full name":
+            case "also known as":
+            case "maiden name":
+              if (names.indexOf(value) === -1) {
+                names.push(value);
+                person.addSimpleName(value);
+              }
+              break;
+            case "gender":
+              if (/^male$/i.test(value)) {
+                person.setGender({ type: "http://gedcomx.org/Male" });
+              } else if (/^female$/i.test(value)) {
+                person.setGender({ type: "http://gedcomx.org/Female" });
+              }
+              break;
+            case "father":
+            case "mother":
+              addRelative(relatives, value, "Parent");
+              break;
+            case "child":
+            case "son":
+            case "daughter":
+              addRelative(relatives, value, "Child");
+              break;
+            case "spouse":
+            case "husband":
+            case "wife":
+            case "partner":
+              addRelative(relatives, value, "Couple");
+              break;
+            case "place of residence":
+              person.addFact({
+                type: "http://gedcomx.org/Residence",
+                place: { original: value }
+              });
+              break;
+            case "occupation":
+              person.addFact({
+                type: "http://gedcomx.org/Occupation",
+                value
+              });
+              break;
+            case "religion":
+              person.addFact({
+                type: "http://gedcomx.org/Religion",
+                value
+              });
+              break;
+            case "race or ethnicity":
+              person.addFact({
+                type: "http://gedcomx.org/Ethnicity",
+                value
+              });
+              break;
+          }
+        });
+      }
+      function addRelative(relatives, name, type) {
+        var exists = relatives.some(function(r) {
+          return r.name === name && r.type === type;
+        });
+        if (!exists) {
+          relatives.push({ name, type });
+        }
+      }
+      function getRecordId(url) {
+        var match = url.match(/\/memorial\/(\d+)/);
+        return match ? match[1] : void 0;
+      }
+    }
+  });
+
+  // src/scrapers/abmc.js
+  var require_abmc = __commonJS({
+    "src/scrapers/abmc.js"(exports, module) {
+      var debug = require_browser()("genscrape:scrapers:abmc");
+      var utils = require_utils2();
+      var GedcomX = require_src();
+      var urls = [
+        utils.urlPatternToRegex("https://www.abmc.gov/profile/*"),
+        utils.urlPatternToRegex("https://abmc.gov/profile/*")
+      ];
+      module.exports = function(register) {
+        register(urls, run);
+      };
+      var rankWords = [
+        "private",
+        "first",
+        "second",
+        "class",
+        "corporal",
+        "sergeant",
+        "staff",
+        "technical",
+        "master",
+        "gunnery",
+        "lance",
+        "major",
+        "colonel",
+        "lieutenant",
+        "captain",
+        "general",
+        "brigadier",
+        "admiral",
+        "rear",
+        "vice",
+        "commander",
+        "ensign",
+        "seaman",
+        "apprentice",
+        "petty",
+        "officer",
+        "chief",
+        "warrant",
+        "flight",
+        "pilot",
+        "airman",
+        "specialist",
+        "cadet",
+        "chaplain",
+        "junior",
+        "grade",
+        "senior",
+        "fireman",
+        "musician",
+        "cook",
+        "mechanic",
+        "bugler",
+        "wagoner",
+        "saddler",
+        "sergeant-major",
+        "quartermaster",
+        "machinist's",
+        "mate",
+        "coxswain",
+        "yeoman",
+        "radioman",
+        "storekeeper",
+        "surgeon",
+        "of",
+        "the",
+        "and",
+        "army",
+        "fleet",
+        "colonel",
+        "second-class",
+        "first-class"
+      ];
+      function run(emitter) {
+        debug("run");
+        var $heading = document.querySelector(".usa-card__heading");
+        if (!$heading) {
+          return emitter.emit("noData");
+        }
+        var slug = getRecordId(document.location.href), fullTitle = text($heading), nameParts = splitRank(fullTitle), gedx = new GedcomX(), person = GedcomX.Person({
+          id: slug,
+          principal: true,
+          identifiers: {
+            "genscrape": "genscrape://abmc/" + slug
+          }
+        });
+        person.addSimpleName(nameParts.name);
+        var categories = text(document.querySelector(".abmc-profile-card__categories")).split(/\s*,\s*/), cemetery, branch, war;
+        categories.forEach(function(category) {
+          if (/(Cemetery|Memorial)$/i.test(category) && !cemetery) {
+            cemetery = category;
+          } else if (/^U\.S\./.test(category) && !branch) {
+            branch = category;
+          } else if (/^(World War|Korean War|Vietnam War|Spanish)/i.test(category)) {
+            war = category;
+          }
+        });
+        var fields = {};
+        Array.prototype.forEach.call(document.querySelectorAll(".usa-card__body li"), function($li) {
+          var $label = $li.querySelector("strong");
+          if ($label) {
+            var label = text($label).replace(/:$/, "");
+            fields[label] = text($li).substr(text($label).length).trim();
+          }
+        });
+        addEvent(person, "http://gedcomx.org/Birth", fields["Date of Birth"]);
+        addEvent(person, "http://gedcomx.org/Death", fields["Date of Death"], fields["Place of Death"]);
+        var burialPlace = fields["Cemetery"] || cemetery;
+        if (burialPlace) {
+          person.addFact({
+            type: "http://gedcomx.org/Burial",
+            place: { original: burialPlace }
+          });
+        }
+        if (fields["Hometown"]) {
+          person.addFact({
+            type: "http://gedcomx.org/Residence",
+            place: { original: fields["Hometown"] }
+          });
+        }
+        var service = [];
+        if (nameParts.rank) {
+          service.push(nameParts.rank);
+        }
+        if (fields["Unit"]) {
+          service.push(fields["Unit"]);
+        }
+        if (branch) {
+          service.push(branch);
+        }
+        if (war) {
+          service.push(war);
+        }
+        if (service.length) {
+          person.addFact({
+            type: "http://gedcomx.org/MilitaryService",
+            value: service.join("; ")
+          });
+        }
+        if (fields["Awards"]) {
+          fields["Awards"].split(/\s*,\s*/).forEach(function(award) {
+            if (award) {
+              person.addFact({
+                type: "http://gedcomx.org/MilitaryAward",
+                value: award
+              });
+            }
+          });
+        }
+        gedx.addPerson(person);
+        gedx.addAgent(GedcomX.Agent().setId("agent").addName({
+          lang: "en",
+          value: "American Battle Monuments Commission"
+        }).setHomepage({
+          resource: "https://www.abmc.gov"
+        }));
+        var title = document.title.replace(/\s*-\s*American Battle Monuments Commission.*$/, "");
+        gedx.addSourceDescriptionToAll({
+          about: document.location.href,
+          titles: [
+            {
+              value: title + " - American Battle Monuments Commission"
+            }
+          ],
+          citations: [
+            {
+              value: 'American Battle Monuments Commission, "' + title + '" (' + document.location.href + " : accessed " + utils.getDateString() + ")."
+            }
+          ],
+          repository: {
+            resource: "#agent"
+          }
+        });
+        emitter.emit("data", gedx);
+      }
+      function text($el) {
+        return $el ? $el.textContent.replace(/\s+/g, " ").trim() : "";
+      }
+      function addEvent(person, type, date, place) {
+        if (date || place) {
+          var fact = GedcomX.Fact({ type });
+          if (date) {
+            fact.setDate({ original: date });
+          }
+          if (place) {
+            fact.setPlace({ original: place });
+          }
+          person.addFact(fact);
+        }
+      }
+      function splitRank(title) {
+        var words = title.split(" "), i = 0;
+        while (i < words.length - 2 && rankWords.indexOf(words[i].toLowerCase()) !== -1) {
+          i++;
+        }
+        return {
+          rank: words.slice(0, i).join(" "),
+          name: words.slice(i).join(" ")
+        };
+      }
+      function getRecordId(url) {
+        var match = url.match(/\/profile\/([^\/?#]+)/);
+        return match ? match[1] : void 0;
+      }
+    }
+  });
+
+  // src/scrapers/cvwm.js
+  var require_cvwm = __commonJS({
+    "src/scrapers/cvwm.js"(exports, module) {
+      var debug = require_browser()("genscrape:scrapers:cvwm");
+      var utils = require_utils2();
+      var GedcomX = require_src();
+      var urls = [
+        utils.urlPatternToRegex("https://www.veterans.gc.ca/eng/remembrance/memorials/canadian-virtual-war-memorial/detail/*"),
+        utils.urlPatternToRegex("https://www.veterans.gc.ca/en/remembrance/memorials/canadian-virtual-war-memorial/detail/*"),
+        utils.urlPatternToRegex("https://veterans.gc.ca/eng/remembrance/memorials/canadian-virtual-war-memorial/detail/*"),
+        utils.urlPatternToRegex("https://veterans.gc.ca/en/remembrance/memorials/canadian-virtual-war-memorial/detail/*")
+      ];
+      module.exports = function(register) {
+        register(urls, run);
+      };
+      function run(emitter) {
+        debug("run");
+        var $h1 = document.querySelector(".casualty h1, main h1"), $profile = document.querySelector(".casualty-profile");
+        if (!$h1 || !$profile) {
+          return emitter.emit("noData");
+        }
+        var id = getRecordId(document.location.href), fields = readFields(), fullTitle = text($h1), name = fullTitle, gedx = new GedcomX(), person = GedcomX.Person({
+          id,
+          principal: true,
+          identifiers: {
+            "genscrape": "genscrape://cvwm/" + id
+          }
+        });
+        var rank = fields["Rank"];
+        if (rank && fullTitle.indexOf(rank + " ") === 0) {
+          name = fullTitle.substr(rank.length + 1);
+        }
+        person.addSimpleName(name);
+        addEvent(person, "http://gedcomx.org/Birth", fields["Birth"]);
+        addEvent(person, "http://gedcomx.org/Death", fields["Death"]);
+        var $cemetery = document.querySelector('a[href="#cemetery"]');
+        if ($cemetery) {
+          var burial = GedcomX.Fact({
+            type: "http://gedcomx.org/Burial",
+            place: {
+              original: utils.toTitleCase(text($cemetery).toLowerCase())
+            }
+          });
+          if (fields["Grave reference"]) {
+            burial.setValue(fields["Grave reference"].replace(/\.$/, ""));
+          }
+          person.addFact(burial);
+        }
+        var service = [];
+        ["Rank", "Force", "Unit/Regiment", "Division"].forEach(function(key) {
+          if (fields[key]) {
+            service.push(fields[key]);
+          }
+        });
+        if (fields["Service number"]) {
+          service.push("Service number " + fields["Service number"]);
+        }
+        if (service.length) {
+          var serviceFact = GedcomX.Fact({
+            type: "http://gedcomx.org/MilitaryService",
+            value: service.join("; ")
+          });
+          var enlistment = splitDatePlace(fields["Enlistment"]);
+          if (enlistment.date) {
+            serviceFact.setDate({ original: enlistment.date });
+          }
+          if (enlistment.place) {
+            serviceFact.setPlace({ original: enlistment.place });
+          }
+          person.addFact(serviceFact);
+        }
+        var relatives = [];
+        var $additional = document.querySelector(".field--name-field-additional-information .field--item");
+        if ($additional) {
+          relatives = parseAdditionalInfo(text($additional), person);
+        }
+        gedx.addPerson(person);
+        relatives.forEach(function(rel) {
+          var relative = gedx.addRelativeFromName(person, rel.name, rel.type);
+          if (rel.gender) {
+            relative.setGender({ type: rel.gender });
+          }
+        });
+        gedx.addAgent(GedcomX.Agent().setId("agent").addName({
+          lang: "en",
+          value: "Veterans Affairs Canada"
+        }).setHomepage({
+          resource: "https://www.veterans.gc.ca"
+        }));
+        gedx.addSourceDescriptionToAll({
+          about: document.location.href,
+          titles: [
+            {
+              value: fullTitle + " - The Canadian Virtual War Memorial"
+            }
+          ],
+          citations: [
+            {
+              value: 'Veterans Affairs Canada, "The Canadian Virtual War Memorial: ' + fullTitle + '" (' + document.location.href + " : accessed " + utils.getDateString() + ")."
+            }
+          ],
+          repository: {
+            resource: "#agent"
+          }
+        });
+        emitter.emit("data", gedx);
+      }
+      function text($el) {
+        return $el ? $el.textContent.replace(/\s+/g, " ").trim() : "";
+      }
+      function readFields() {
+        var fields = {};
+        Array.prototype.forEach.call(document.querySelectorAll(".profile-field"), function($field) {
+          var $label = $field.querySelector(".views-label"), $value = $field.querySelector(".field-content");
+          if ($label && $value) {
+            fields[text($label).replace(/:$/, "")] = text($value);
+          }
+        });
+        return fields;
+      }
+      function splitDatePlace(value) {
+        if (!value) {
+          return {};
+        }
+        var match = value.match(/^((?:[A-Z][a-z]+ )?(?:\d{1,2}, )?\d{4})\s*(.*)$/);
+        if (match) {
+          return { date: match[1], place: match[2] };
+        }
+        return { place: value };
+      }
+      function addEvent(person, type, value) {
+        var parts = splitDatePlace(value);
+        if (parts.date || parts.place) {
+          var fact = GedcomX.Fact({ type });
+          if (parts.date) {
+            fact.setDate({ original: parts.date });
+          }
+          if (parts.place) {
+            fact.setPlace({ original: parts.place });
+          }
+          person.addFact(fact);
+        }
+      }
+      function parseAdditionalInfo(info, person) {
+        var relatives = [];
+        info.split(/;\s*/).forEach(function(clause) {
+          var match = clause.match(/^(Son|Daughter|Husband|Wife) of (.+)$/i);
+          if (!match) {
+            return;
+          }
+          var kind = match[1].toLowerCase(), names = match[2].split(/,\s+of\s+/)[0].replace(/[\s.]+$/, "");
+          switch (kind) {
+            case "son":
+            case "daughter":
+              person.setGender({
+                type: kind === "son" ? "http://gedcomx.org/Male" : "http://gedcomx.org/Female"
+              });
+              splitParents(names).forEach(function(parent) {
+                relatives.push({ name: parent, type: "Parent" });
+              });
+              break;
+            case "husband":
+            case "wife":
+              person.setGender({
+                type: kind === "husband" ? "http://gedcomx.org/Male" : "http://gedcomx.org/Female"
+              });
+              relatives.push({
+                name: names,
+                type: "Couple",
+                gender: kind === "husband" ? "http://gedcomx.org/Female" : "http://gedcomx.org/Male"
+              });
+              break;
+          }
+        });
+        return relatives;
+      }
+      function splitParents(names) {
+        var parts = names.split(/\s+and\s+/);
+        if (parts.length === 2) {
+          var second = parts[1].split(" ");
+          if (parts[0].indexOf(" ") === -1 && second.length > 1) {
+            parts[0] = parts[0] + " " + second[second.length - 1];
+          }
+        }
+        return parts.filter(function(p) {
+          return p;
+        });
+      }
+      function getRecordId(url) {
+        var match = url.match(/\/detail\/(\d+)/);
+        return match ? match[1] : void 0;
+      }
+    }
+  });
+
+  // src/scrapers/awm.js
+  var require_awm = __commonJS({
+    "src/scrapers/awm.js"(exports, module) {
+      var debug = require_browser()("genscrape:scrapers:awm");
+      var utils = require_utils2();
+      var GedcomX = require_src();
+      var urls = [
+        utils.urlPatternToRegex("https://www.awm.gov.au/collection/R*")
+      ];
+      module.exports = function(register) {
+        register(urls, run);
+      };
+      function run(emitter) {
+        debug("run");
+        var $name = document.querySelector("h1.title__heading span"), fields = readFields();
+        if (!$name || !fields["Date of Death"]) {
+          return emitter.emit("noData");
+        }
+        var id = getRecordId(document.location.href), name = text($name), gedx = new GedcomX(), person = GedcomX.Person({
+          id,
+          principal: true,
+          identifiers: {
+            "genscrape": "genscrape://awm/" + id
+          }
+        });
+        person.addSimpleName(name);
+        var death = GedcomX.Fact({
+          type: "http://gedcomx.org/Death",
+          date: { original: fields["Date of Death"].replace(/^0/, "") }
+        });
+        if (fields["Place of Death"]) {
+          death.setPlace({ original: fields["Place of Death"] });
+        }
+        if (fields["Cause of Death"]) {
+          death.setValue(fields["Cause of Death"]);
+        }
+        person.addFact(death);
+        if (fields["Cemetery or Memorial Details"]) {
+          person.addFact({
+            type: "http://gedcomx.org/Burial",
+            place: { original: fields["Cemetery or Memorial Details"] }
+          });
+        }
+        if (fields["Place of Association"]) {
+          person.addFact({
+            type: "http://gedcomx.org/Residence",
+            place: { original: fields["Place of Association"] }
+          });
+        }
+        var service = [];
+        ["Conflict/Operation", "Rank", "Unit", "Service"].forEach(function(key) {
+          if (fields[key]) {
+            service.push(fields[key]);
+          }
+        });
+        if (fields["Service number"]) {
+          service.push("Service number " + fields["Service number"]);
+        }
+        if (fields["Age at Death"]) {
+          service.push("Age at death " + fields["Age at Death"]);
+        }
+        if (service.length) {
+          person.addFact({
+            type: "http://gedcomx.org/MilitaryService",
+            value: service.join("; ")
+          });
+        }
+        gedx.addPerson(person);
+        gedx.addAgent(GedcomX.Agent().setId("agent").addName({
+          lang: "en",
+          value: "Australian War Memorial"
+        }).setHomepage({
+          resource: "https://www.awm.gov.au"
+        }));
+        var title = "Roll of Honour: " + name;
+        gedx.addSourceDescriptionToAll({
+          about: document.location.href,
+          titles: [
+            {
+              value: title + " - Australian War Memorial"
+            }
+          ],
+          citations: [
+            {
+              value: 'Australian War Memorial, "' + title + '" (' + document.location.href + " : accessed " + utils.getDateString() + ")."
+            }
+          ],
+          repository: {
+            resource: "#agent"
+          }
+        });
+        emitter.emit("data", gedx);
+      }
+      function text($el) {
+        return $el ? $el.textContent.replace(/\s+/g, " ").trim() : "";
+      }
+      function readFields() {
+        var fields = {};
+        Array.prototype.forEach.call(document.querySelectorAll(".entry-content table tr"), function($row) {
+          var $th = $row.querySelector("th"), $td = $row.querySelector("td");
+          if ($th && $td) {
+            fields[text($th)] = text($td);
+          }
+        });
+        return fields;
+      }
+      function getRecordId(url) {
+        var match = url.match(/\/collection\/(R\d+)/);
+        return match ? match[1] : void 0;
+      }
+    }
+  });
+
+  // src/scrapers/familysearch-ancestors-public.js
+  var require_familysearch_ancestors_public = __commonJS({
+    "src/scrapers/familysearch-ancestors-public.js"(exports, module) {
+      var debug = require_browser()("genscrape:scrapers:familysearch-ancestors-public");
+      var utils = require_utils2();
+      var GedcomX = require_src();
+      var urls = [
+        utils.urlPatternToRegex("https://ancestors.familysearch.org/*/*-*/*")
+      ];
+      var monthNames = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ];
+      module.exports = function(register) {
+        register(urls, run);
+      };
+      function run(emitter) {
+        debug("run");
+        var data = getPersonData();
+        if (!data) {
+          return emitter.emit("noData");
+        }
+        var gedx = new GedcomX(), primary = queryPerson(data, getIdFromUrl() || data.identifier);
+        primary.setPrincipal(true);
+        gedx.addPerson(primary);
+        asArray(data.parent).forEach(function(parent) {
+          var person = queryPerson(parent);
+          if (person) {
+            gedx.addPerson(person);
+            gedx.addRelationship({
+              type: "http://gedcomx.org/ParentChild",
+              person1: person,
+              person2: primary
+            });
+          }
+        });
+        asArray(data.spouse).forEach(function(spouse) {
+          var person = queryPerson(spouse);
+          if (person) {
+            gedx.addPerson(person);
+            gedx.addRelationship({
+              type: "http://gedcomx.org/Couple",
+              person1: primary,
+              person2: person
+            });
+          }
+        });
+        asArray(data.children).forEach(function(child) {
+          var person = queryPerson(child);
+          if (person) {
+            gedx.addPerson(person);
+            gedx.addRelationship({
+              type: "http://gedcomx.org/ParentChild",
+              person1: primary,
+              person2: person
+            });
+          }
+        });
+        gedx.addAgent(GedcomX.Agent().setId("agent").addName({
+          lang: "en",
+          value: "FamilySearch Ancestors"
+        }).setHomepage({
+          resource: "https://ancestors.familysearch.org"
+        }));
+        var title = data.name + " - FamilySearch Ancestors";
+        gedx.addSourceDescriptionToAll({
+          about: document.location.href,
+          titles: [
+            {
+              value: title
+            }
+          ],
+          citations: [
+            {
+              value: '"' + title + '," FamilySearch Ancestors (' + document.location.href + " : accessed " + utils.getDateString() + ")"
+            }
+          ],
+          repository: {
+            resource: "#agent"
+          }
+        });
+        emitter.emit("data", gedx);
+      }
+      function getPersonData() {
+        var scripts = document.querySelectorAll('script[type="application/ld+json"]');
+        for (var i = 0; i < scripts.length; i++) {
+          try {
+            var json = JSON.parse(scripts[i].textContent);
+            if (json && json["@type"] === "Person" && json.name) {
+              return json;
+            }
+          } catch (e) {
+            debug("invalid json-ld");
+          }
+        }
+      }
+      function getIdFromUrl() {
+        var match = document.location.pathname.match(/^\/[^\/]+\/([^\/]+)/);
+        return match ? match[1] : null;
+      }
+      function asArray(value) {
+        return Array.isArray(value) ? value : [];
+      }
+      function queryPerson(data, id) {
+        if (!data || !data.name) {
+          return null;
+        }
+        id = id || data.identifier;
+        var person = GedcomX.Person();
+        if (id) {
+          person.setId(id);
+          person.setIdentifiers({
+            "genscrape": "genscrape://familysearch-ancestors-public/" + id
+          });
+        }
+        person.addSimpleName(data.name);
+        if (data.gender === "Male") {
+          person.setGender({ type: "http://gedcomx.org/Male" });
+        } else if (data.gender === "Female") {
+          person.setGender({ type: "http://gedcomx.org/Female" });
+        }
+        addFact(person, "http://gedcomx.org/Birth", data.birthDate, data.birthPlace);
+        addFact(person, "http://gedcomx.org/Death", data.deathDate, data.deathPlace);
+        return person;
+      }
+      function addFact(person, type, date, place) {
+        date = formatDate(date);
+        var placeText = place && (place.address || place.name);
+        if (typeof placeText !== "string") {
+          placeText = null;
+        }
+        if (date || placeText) {
+          var fact = GedcomX.Fact({ type });
+          if (date) {
+            fact.setDate({ original: date });
+          }
+          if (placeText) {
+            fact.setPlace({ original: placeText });
+          }
+          person.addFact(fact);
+        }
+      }
+      function formatDate(value) {
+        if (typeof value !== "string" || !value) {
+          return null;
+        }
+        var parts = value.split("/");
+        if (parts.length === 2) {
+          if (parts[0] && !parts[1]) {
+            return "After " + formatSingle(parts[0]);
+          } else if (!parts[0] && parts[1]) {
+            return "Before " + formatSingle(parts[1]);
+          } else if (parts[0] && parts[1]) {
+            return "From " + formatSingle(parts[0]) + " to " + formatSingle(parts[1]);
+          }
+          return null;
+        }
+        return formatSingle(value);
+      }
+      function formatSingle(value) {
+        var m = value.replace(/^\+/, "").match(/^(-?\d+)(?:-(\d\d))?(?:-(\d\d))?/);
+        if (!m) {
+          return value;
+        }
+        var year = m[1].replace(/^-/, "").replace(/^0+(?=\d)/, "");
+        var text = year;
+        if (m[2]) {
+          text = monthNames[parseInt(m[2], 10) - 1] + " " + year;
+          if (m[3]) {
+            text = parseInt(m[3], 10) + " " + text;
+          }
+        }
+        return m[1][0] === "-" ? text + " BC" : text;
+      }
+    }
+  });
+
+  // src/scrapers/thepeerage.js
+  var require_thepeerage = __commonJS({
+    "src/scrapers/thepeerage.js"(exports, module) {
+      var debug = require_browser()("genscrape:scrapers:thepeerage");
+      var utils = require_utils2();
+      var GedcomX = require_src();
+      var urls = [
+        /^https?:\/\/(?:www\.)?thepeerage\.com\/p\d+\.htm/
+      ];
+      var MONTHS = "January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec";
+      var DATE_REGEX = new RegExp("(?:(?:circa|c|before|after|say|between|about)\\.?\\s+)?(?:\\d{1,2}\\s+)?(?:(?:" + MONTHS + ")\\s+)?\\d{4}(?:\\s+and\\s+(?:\\d{1,2}\\s+)?(?:(?:" + MONTHS + ")\\s+)?\\d{4})?", "g");
+      var NAME_CLASSES = {
+        nt: "http://gedcomx.org/Prefix",
+        ng: "http://gedcomx.org/Given",
+        ns: "http://gedcomx.org/Surname",
+        nu: "http://gedcomx.org/Suffix"
+      };
+      module.exports = function(register) {
+        register(urls, run);
+      };
+      function run(emitter) {
+        debug("run");
+        var $person = getPrincipalElement();
+        if (!$person) {
+          return emitter.emit("noData");
+        }
+        var gedx = new GedcomX(), persons = {}, principalId = $person.id.replace(/^i/, ""), primary = GedcomX.Person({
+          id: principalId,
+          identifiers: {
+            "genscrape": "genscrape://thepeerage/" + principalId
+          }
+        });
+        primary.setPrincipal(true);
+        persons[principalId] = primary;
+        gedx.addPerson(primary);
+        var $narr = $person.querySelector(".narr");
+        var nameParts = {}, fullName = getHeadingText($person.querySelector("h2"));
+        if ($narr) {
+          for (var i = 0; i < $narr.children.length; i++) {
+            var type = nameTypeOf($narr.children[i]);
+            if (type) {
+              nameParts[type] = (nameParts[type] ? nameParts[type] + " " : "") + $narr.children[i].textContent.trim();
+            }
+          }
+        }
+        addName(primary, nameParts, fullName);
+        var $info = $person.querySelector(".sinfo"), info = $info ? $info.textContent.trim() : "", infoMatch = info.match(/^([MF]),/);
+        if (infoMatch) {
+          primary.setGender({
+            type: infoMatch[1] === "M" ? "http://gedcomx.org/Male" : "http://gedcomx.org/Female"
+          });
+        }
+        var facts = {};
+        var birthInfo = info.match(/\bb\. (.+?)(?:, d\. |$)/), deathInfo = info.match(/\bd\. (.+)$/);
+        if ($narr) {
+          var sentences = getSentences($narr);
+          sentences.forEach(function(sentence, index) {
+            debug("sentence", index, sentence);
+            processSentence(sentence, primary, gedx, persons, facts, index === 0);
+          });
+        }
+        if (birthInfo && !facts.birth) {
+          primary.addFact(makeFact("http://gedcomx.org/Birth", birthInfo[1], null));
+        }
+        if (deathInfo && !facts.death) {
+          primary.addFact(makeFact("http://gedcomx.org/Death", deathInfo[1], null));
+        }
+        var $families = $person.querySelectorAll(".fams");
+        for (var f = 0; f < $families.length; f++) {
+          var $heading = $families[f].querySelector("h3"), otherParent = null;
+          if ($heading) {
+            var $parentLink = $heading.querySelector("a");
+            if ($parentLink) {
+              otherParent = getRelative($parentLink, persons, gedx);
+            }
+          }
+          var $items = $families[f].querySelectorAll("li");
+          for (var c = 0; c < $items.length; c++) {
+            var $childLink = $items[c].querySelector("a");
+            if (!$childLink) {
+              continue;
+            }
+            var child = getRelative($childLink, persons, gedx);
+            if (!child) {
+              continue;
+            }
+            addDatesFromListItem(child, $items[c].textContent);
+            addParentChild(gedx, primary, child);
+            if (otherParent) {
+              addParentChild(gedx, otherParent, child);
+              addCouple(gedx, primary, otherParent);
+            }
+          }
+        }
+        gedx.addAgent(GedcomX.Agent().setId("agent").addName({
+          lang: "en",
+          value: "thePeerage.com"
+        }).setHomepage({
+          resource: "http://www.thepeerage.com"
+        }));
+        var title = fullName + " - thePeerage.com";
+        gedx.addSourceDescriptionToAll({
+          about: document.location.href,
+          titles: [
+            {
+              value: title
+            }
+          ],
+          citations: [
+            {
+              value: '"' + title + '," thePeerage.com (' + document.location.href + " : accessed " + utils.getDateString() + ")"
+            }
+          ],
+          repository: {
+            resource: "#agent"
+          }
+        });
+        emitter.emit("data", gedx);
+      }
+      function getPrincipalElement() {
+        var hash = document.location.hash;
+        if (hash && hash.length > 1) {
+          var $el = document.getElementById(hash.substring(1));
+          if ($el && /(^|\s)itp(\s|$)/.test($el.className)) {
+            return $el;
+          }
+        }
+        return document.querySelector(".itp");
+      }
+      function nameTypeOf($el) {
+        var classes = ($el.className || "").split(/\s+/);
+        for (var i = 0; i < classes.length; i++) {
+          if (NAME_CLASSES[classes[i]]) {
+            return NAME_CLASSES[classes[i]];
+          }
+        }
+        return null;
+      }
+      function addName(person, nameParts, fullText) {
+        var hasParts = Object.keys(nameParts).length > 0;
+        if (!hasParts) {
+          person.addSimpleName(fullText);
+          return;
+        }
+        var nameForm = GedcomX.NameForm();
+        var textParts = [];
+        [
+          "http://gedcomx.org/Prefix",
+          "http://gedcomx.org/Given",
+          "http://gedcomx.org/Surname",
+          "http://gedcomx.org/Suffix"
+        ].forEach(function(type) {
+          if (nameParts[type]) {
+            nameForm.addPart({ type, value: nameParts[type] });
+            textParts.push(nameParts[type]);
+          }
+        });
+        nameForm.setFullText(fullText || textParts.join(" "));
+        person.addName(GedcomX.Name().addNameForm(nameForm));
+      }
+      function getRelative($link, persons, gedx) {
+        var href = $link.getAttribute("href") || "", match = href.match(/#i(\d+)$/);
+        if (!match) {
+          return null;
+        }
+        var id = match[1];
+        if (persons[id]) {
+          return persons[id];
+        }
+        var person = GedcomX.Person({
+          id,
+          identifiers: {
+            "genscrape": "genscrape://thepeerage/" + id
+          }
+        });
+        var nameParts = {};
+        for (var i = 0; i < $link.children.length; i++) {
+          var type = nameTypeOf($link.children[i]);
+          if (type) {
+            var text = $link.children[i].textContent.trim();
+            nameParts[type] = (nameParts[type] ? nameParts[type] + " " : "") + text;
+          }
+        }
+        addName(person, nameParts, $link.textContent.replace(/\s+/g, " ").trim());
+        persons[id] = person;
+        gedx.addPerson(person);
+        return person;
+      }
+      function addParentChild(gedx, parent, child) {
+        gedx.addRelationship({
+          type: "http://gedcomx.org/ParentChild",
+          person1: parent,
+          person2: child
+        });
+      }
+      function addCouple(gedx, p1, p2) {
+        if (gedx.getRelationships().some(function(r) {
+          return r.getType() === "http://gedcomx.org/Couple" && (r.getPerson1().getResource() === "#" + p1.getId() && r.getPerson2().getResource() === "#" + p2.getId() || r.getPerson1().getResource() === "#" + p2.getId() && r.getPerson2().getResource() === "#" + p1.getId());
+        })) {
+          return null;
+        }
+        return gedx.addRelationship({
+          type: "http://gedcomx.org/Couple",
+          person1: p1,
+          person2: p2
+        });
+      }
+      function addDatesFromListItem(person, text) {
+        text = text.replace(/\s+/g, " ");
+        var b = text.match(/\bb\. (.+?)(?:, d\. |$)/), d = text.match(/\bd\. (.+)$/);
+        if (b && !hasFact(person, "http://gedcomx.org/Birth")) {
+          person.addFact(makeFact("http://gedcomx.org/Birth", b[1].trim(), null));
+        }
+        if (d && !hasFact(person, "http://gedcomx.org/Death")) {
+          person.addFact(makeFact("http://gedcomx.org/Death", d[1].trim(), null));
+        }
+      }
+      function hasFact(person, type) {
+        return (person.getFacts() || []).some(function(fact) {
+          return fact.getType() === type;
+        });
+      }
+      function makeFact(type, date, place) {
+        var fact = GedcomX.Fact({ type });
+        if (date) {
+          fact.setDate({ original: date });
+        }
+        if (place) {
+          fact.setPlace({ original: place });
+        }
+        return fact;
+      }
+      var linkElements = {};
+      function getSentences($narr) {
+        var out = "";
+        function walk(node) {
+          for (var n = node.firstChild; n; n = n.nextSibling) {
+            if (n.nodeType === 3) {
+              out += n.nodeValue;
+            } else if (n.nodeType === 1) {
+              var tag = n.nodeName.toLowerCase(), cls = n.className || "";
+              if (tag === "sup" || /(^|\s)pid(\s|$)/.test(cls)) {
+                continue;
+              }
+              if (tag === "br") {
+                out += " ";
+              } else if (tag === "a") {
+                var href = n.getAttribute("href") || "", text = n.textContent.replace(/\s+/g, " ").trim(), personMatch = href.match(/#i(\d+)$/);
+                if (/^pd\d+\.htm/.test(href)) {
+                  out += "[[" + text + "]]" + (/\.$/.test(text) ? "." : "");
+                } else if (personMatch) {
+                  linkElements[personMatch[1]] = linkElements[personMatch[1]] || n;
+                  out += "<<" + personMatch[1] + "|" + text + ">>";
+                } else {
+                  out += text;
+                }
+              } else {
+                walk(n);
+              }
+            }
+          }
+        }
+        walk($narr);
+        out = out.replace(/ /g, " ").replace(/\s+/g, " ").trim();
+        out = out.replace(/(<<|\[\[)(.*?)(>>|\]\])/g, function(m) {
+          return m.replace(/\./g, "");
+        });
+        return out.split(/\.(?:\s+|$)/).map(function(s) {
+          return s.replace(/\u0001/g, ".").trim();
+        }).filter(Boolean);
+      }
+      function stripTokens(s) {
+        return s.replace(/<<\d+\|(.*?)>>/g, "$1").replace(/\[\[(.*?)\]\]/g, "$1");
+      }
+      function findDate(text) {
+        var matches = text.match(DATE_REGEX);
+        return matches ? matches[0] : null;
+      }
+      function findPlace(text) {
+        var m = text.match(/\[\[(.+?)\]\]/);
+        return m ? m[1] : null;
+      }
+      var EVENTS = [
+        { regex: /\bwas born\b(.*)$/, type: "http://gedcomx.org/Birth", key: "birth" },
+        { regex: /\bwas (?:baptised|baptized)\b(.*)$/, type: "http://gedcomx.org/Baptism" },
+        { regex: /\bwas christened\b(.*)$/, type: "http://gedcomx.org/Christening" },
+        { regex: /\bdied\b(.*)$/, type: "http://gedcomx.org/Death", key: "death" },
+        { regex: /\bwas buried\b(.*)$/, type: "http://gedcomx.org/Burial" },
+        { regex: /\bwas cremated\b(.*)$/, type: "http://gedcomx.org/Cremation" },
+        { regex: /\bwas (?:christened|confirmed)\b(.*)$/, type: "http://gedcomx.org/Christening" },
+        { regex: /\b(?:lived|resided)\b(.*)$/, type: "http://gedcomx.org/Residence" },
+        { regex: /\bemigrated\b(.*)$/, type: "http://gedcomx.org/Emigration" },
+        { regex: /\bimmigrated\b(.*)$/, type: "http://gedcomx.org/Immigration" }
+      ];
+      function processSentence(sentence, primary, gedx, persons, facts, isFirst) {
+        var parentMatch = sentence.match(/\bwas the (?:son|daughter|child) of (.*)$/);
+        if (parentMatch && (isFirst || /^(?:He|She) /.test(sentence))) {
+          var parentRe = /<<(\d+)\|(.*?)>>/g, m;
+          var chunkMatch = parentMatch[1].match(/^<<\d+\|.*?>>(?: and <<\d+\|.*?>>)?/), chunk = chunkMatch ? chunkMatch[0] : "";
+          while (m = parentRe.exec(chunk)) {
+            var parent = getRelative(makeLink(m[1], m[2]), persons, gedx);
+            if (parent) {
+              addParentChild(gedx, parent, primary);
+            }
+          }
+          var ids = [], cm, re2 = /<<(\d+)\|/g;
+          while (cm = re2.exec(chunk)) {
+            ids.push(cm[1]);
+          }
+          if (ids.length === 2 && persons[ids[0]] && persons[ids[1]]) {
+            addCouple(gedx, persons[ids[0]], persons[ids[1]]);
+          }
+          return;
+        }
+        var marriageMatch = !(isFirst || /^(?:He|She) /.test(sentence)) ? null : sentence.match(/\bmarried(?:,? (?:firstly|secondly|thirdly|fourthly|fifthly|sixthly|seventhly),?)? <<(\d+)\|(.*?)>>(.*)$/);
+        if (marriageMatch) {
+          var spouse = getRelative(makeLink(marriageMatch[1], marriageMatch[2]), persons, gedx);
+          if (spouse) {
+            addCouple(gedx, primary, spouse);
+            var rest = marriageMatch[3];
+            var cleaned = rest.replace(/<<\d+\|.*?>>/g, "");
+            var date = findDate(cleaned), place = findPlace(rest);
+            var marriage = makeFact("http://gedcomx.org/Marriage", date, place);
+            if (date || place) {
+              primary.addFact(marriage);
+            }
+          }
+          return;
+        }
+        for (var i = 0; i < EVENTS.length; i++) {
+          var ev = EVENTS[i], evMatch = sentence.match(ev.regex);
+          if (evMatch && /^(?:He|She|[A-ZÀ-Þ])/.test(sentence)) {
+            var restText = evMatch[1], evDate = findDate(stripTokens(restText)), evPlace = findPlace(restText);
+            if (evDate || evPlace) {
+              primary.addFact(makeFact(ev.type, evDate, evPlace));
+              if (ev.key) {
+                facts[ev.key] = true;
+              }
+            } else if (ev.key) {
+            }
+            return;
+          }
+        }
+      }
+      function makeLink(id, text) {
+        if (linkElements[id]) {
+          return linkElements[id];
+        }
+        var $a = document.createElement("a");
+        $a.setAttribute("href", "p0.htm#i" + id);
+        $a.textContent = text;
+        return $a;
+      }
+      function getHeadingText($h2) {
+        var text = "";
+        if ($h2) {
+          for (var n = $h2.firstChild; n; n = n.nextSibling) {
+            if (n.nodeType === 3) {
+              text += n.nodeValue;
+            } else if (n.nodeType === 1 && n.nodeName.toLowerCase() !== "sup" && n.nodeName.toLowerCase() !== "img") {
+              text += n.textContent;
+            }
+          }
+        }
+        return text.replace(/\s+/g, " ").trim();
+      }
+    }
+  });
+
+  // src/scrapers/gedbas.js
+  var require_gedbas = __commonJS({
+    "src/scrapers/gedbas.js"(exports, module) {
+      var debug = require_browser()("genscrape:scrapers:gedbas");
+      var utils = require_utils2();
+      var GedcomX = require_src();
+      var urls = [
+        /^https?:\/\/gedbas\.genealogy\.net\/person\/show\/\d+/
+      ];
+      var FACT_TYPES = {
+        "birth": "http://gedcomx.org/Birth",
+        "baptism": "http://gedcomx.org/Baptism",
+        "christening": "http://gedcomx.org/Christening",
+        "death": "http://gedcomx.org/Death",
+        "burial": "http://gedcomx.org/Burial",
+        "cremation": "http://gedcomx.org/Cremation",
+        "marriage": "http://gedcomx.org/Marriage",
+        "divorce": "http://gedcomx.org/Divorce",
+        "emigration": "http://gedcomx.org/Emigration",
+        "immigration": "http://gedcomx.org/Immigration",
+        "residence": "http://gedcomx.org/Residence",
+        "occupation": "http://gedcomx.org/Occupation",
+        "education": "http://gedcomx.org/Education",
+        "religion": "http://gedcomx.org/Religion",
+        "nationality": "http://gedcomx.org/Nationality",
+        "naturalization": "http://gedcomx.org/Naturalization",
+        "census": "http://gedcomx.org/Census",
+        "confirmation": "http://gedcomx.org/Confirmation"
+      };
+      module.exports = function(register) {
+        register(urls, run);
+      };
+      function run(emitter) {
+        debug("run");
+        var $h1 = document.querySelector("#bodyContent h1");
+        if (!$h1 || !$h1.textContent.trim()) {
+          return emitter.emit("noData");
+        }
+        var gedx = new GedcomX(), persons = {}, id = getId(document.location.pathname), name = $h1.textContent.replace(/\s+/g, " ").trim(), primary = createPerson(id, name);
+        primary.setPrincipal(true);
+        persons[id] = primary;
+        gedx.addPerson(primary);
+        addFacts(primary, document.querySelectorAll("#characteristics tbody tr"), true);
+        addFacts(primary, document.querySelectorAll("#events tbody tr"), false);
+        var $parents = document.querySelectorAll('#parents a[href*="/person/show/"]');
+        for (var i = 0; i < $parents.length; i++) {
+          var parent = getRelative($parents[i], persons, gedx);
+          if (parent) {
+            addParentChild(gedx, parent, primary);
+          }
+        }
+        if ($parents.length === 2) {
+          var p1 = persons[getId($parents[0].getAttribute("href"))], p2 = persons[getId($parents[1].getAttribute("href"))];
+          if (p1 && p2) {
+            gedx.addRelationship({
+              type: "http://gedcomx.org/Couple",
+              person1: p1,
+              person2: p2
+            });
+          }
+        }
+        var $rows = document.querySelectorAll("#spouses-and-children tbody tr");
+        for (var r = 0; r < $rows.length; r++) {
+          var $cells = $rows[r].querySelectorAll("td");
+          if ($cells.length < 3) {
+            continue;
+          }
+          var $spouseLink = $cells[1].querySelector('a[href*="/person/show/"]'), spouse = $spouseLink ? getRelative($spouseLink, persons, gedx) : null;
+          if (spouse) {
+            var relationship = GedcomX.Relationship({
+              type: "http://gedcomx.org/Couple",
+              person1: primary,
+              person2: spouse
+            });
+            var spans = $cells[0].querySelectorAll("span"), marriageDate = spans[0] ? cleanDate(spans[0].textContent) : null, marriagePlace = spans[1] ? spans[1].textContent.trim() : null;
+            if (marriageDate || marriagePlace) {
+              var marriage = GedcomX.Fact({ type: "http://gedcomx.org/Marriage" });
+              if (marriageDate) {
+                marriage.setDate({ original: marriageDate });
+              }
+              if (marriagePlace) {
+                marriage.setPlace({ original: marriagePlace });
+              }
+              relationship.addFact(marriage);
+            }
+            gedx.addRelationship(relationship);
+          }
+          var $children = $cells[2].querySelectorAll("li");
+          for (var c = 0; c < $children.length; c++) {
+            var $childLink = $children[c].querySelector('a[href*="/person/show/"]');
+            if (!$childLink) {
+              continue;
+            }
+            var child = getRelative($childLink, persons, gedx);
+            if (!child) {
+              continue;
+            }
+            var $date = $children[c].querySelector("span"), birthDate = $date ? cleanDate($date.textContent) : null;
+            if (birthDate && !(child.getFacts() || []).length) {
+              child.addFact(GedcomX.Fact({
+                type: "http://gedcomx.org/Birth",
+                date: { original: birthDate }
+              }));
+            }
+            addParentChild(gedx, primary, child);
+            if (spouse) {
+              addParentChild(gedx, spouse, child);
+            }
+          }
+        }
+        gedx.addAgent(GedcomX.Agent().setId("agent").addName({
+          lang: "de",
+          value: "GEDBAS"
+        }).setHomepage({
+          resource: "https://gedbas.genealogy.net"
+        }));
+        var title = document.title || "GEDBAS - " + name;
+        gedx.addSourceDescriptionToAll({
+          about: document.location.href,
+          titles: [
+            {
+              value: title
+            }
+          ],
+          citations: [
+            {
+              value: '"' + title + '," GEDBAS (' + document.location.href + " : accessed " + utils.getDateString() + ")"
+            }
+          ],
+          repository: {
+            resource: "#agent"
+          }
+        });
+        emitter.emit("data", gedx);
+      }
+      function getId(url) {
+        var match = (url || "").match(/\/person\/show\/(\d+)/);
+        return match ? match[1] : null;
+      }
+      function createPerson(id, name) {
+        var person = GedcomX.Person({
+          id,
+          identifiers: {
+            "genscrape": "genscrape://gedbas/" + id
+          }
+        });
+        var words = name.split(" "), surnameWords = [], givenWords = words.slice();
+        while (givenWords.length > 1) {
+          var last = givenWords[givenWords.length - 1];
+          if (last === last.toUpperCase() && last !== last.toLowerCase()) {
+            surnameWords.unshift(givenWords.pop());
+          } else {
+            break;
+          }
+        }
+        if (surnameWords.length) {
+          var nameForm = GedcomX.NameForm();
+          nameForm.setFullText(name);
+          nameForm.addPart({ type: "http://gedcomx.org/Given", value: givenWords.join(" ") });
+          nameForm.addPart({ type: "http://gedcomx.org/Surname", value: surnameWords.join(" ") });
+          person.addName(GedcomX.Name().addNameForm(nameForm));
+        } else {
+          person.addSimpleName(name);
+        }
+        return person;
+      }
+      function getRelative($link, persons, gedx) {
+        var id = getId($link.getAttribute("href"));
+        if (!id) {
+          return null;
+        }
+        if (!persons[id]) {
+          persons[id] = createPerson(id, $link.textContent.replace(/\s+/g, " ").trim());
+          gedx.addPerson(persons[id]);
+        }
+        return persons[id];
+      }
+      function addParentChild(gedx, parent, child) {
+        gedx.addRelationship({
+          type: "http://gedcomx.org/ParentChild",
+          person1: parent,
+          person2: child
+        });
+      }
+      function cleanDate(text) {
+        return (text || "").replace(/\s+/g, " ").replace(/(^|\s)(\d{1,2})\./g, "$1$2").trim();
+      }
+      function addFacts(person, $rows, hasValue) {
+        for (var i = 0; i < $rows.length; i++) {
+          var $cells = $rows[i].querySelectorAll("td"), offset = hasValue ? 1 : 0;
+          if ($cells.length < 3 + offset) {
+            continue;
+          }
+          var typeName = $cells[0].textContent.trim().toLowerCase(), type = FACT_TYPES[typeName];
+          if (!type) {
+            continue;
+          }
+          var value = hasValue ? $cells[1].textContent.replace(/\s+/g, " ").trim() : null, $dateSpans = $cells[1 + offset].querySelectorAll("span"), date = cleanDate($dateSpans.length ? $dateSpans[$dateSpans.length - 1].textContent : $cells[1 + offset].textContent), $placeSpan = $cells[2 + offset].querySelector("span"), place = ($placeSpan ? $placeSpan.textContent : $cells[2 + offset].textContent).replace(/\s+/g, " ").trim();
+          if (!date && !place && !value) {
+            continue;
+          }
+          var fact = GedcomX.Fact({ type });
+          if (date) {
+            fact.setDate({ original: date });
+          }
+          if (place) {
+            fact.setPlace({ original: place });
+          }
+          if (value) {
+            fact.setValue(value);
+          }
+          person.addFact(fact);
+        }
+      }
+    }
+  });
+
+  // src/scrapers/rodovid.js
+  var require_rodovid = __commonJS({
+    "src/scrapers/rodovid.js"(exports, module) {
+      var debug = require_browser()("genscrape:scrapers:rodovid");
+      var utils = require_utils2();
+      var GedcomX = require_src();
+      var urls = [
+        utils.urlPatternToRegex("https://*.rodovid.org/wk/Person:*"),
+        utils.urlPatternToRegex("http://*.rodovid.org/wk/Person:*"),
+        utils.urlPatternToRegex("https://rodovid.org/wk/Person:*")
+      ];
+      var factTypes = {
+        "birth": "http://gedcomx.org/Birth",
+        "death": "http://gedcomx.org/Death",
+        "burial": "http://gedcomx.org/Burial",
+        "baptism": "http://gedcomx.org/Baptism",
+        "christening": "http://gedcomx.org/Christening",
+        "cremation": "http://gedcomx.org/Cremation",
+        "occupation": "http://gedcomx.org/Occupation",
+        "residence": "http://gedcomx.org/Residence",
+        "emigration": "http://gedcomx.org/Emigration",
+        "immigration": "http://gedcomx.org/Immigration",
+        "education": "http://gedcomx.org/Education",
+        "religion": "http://gedcomx.org/Religion",
+        "nationality": "http://gedcomx.org/Nationality"
+      };
+      var valueFactTypes = [
+        "http://gedcomx.org/Occupation",
+        "http://gedcomx.org/Education",
+        "http://gedcomx.org/Religion",
+        "http://gedcomx.org/Nationality"
+      ];
+      module.exports = function(register) {
+        register(urls, run);
+      };
+      function run(emitter) {
+        debug("run");
+        var $content = document.getElementById("mw-content-text"), $table = document.querySelector("table.persondata"), id = getRecordId(document.location.href);
+        if (!$content || !$table || !id) {
+          return emitter.emit("noData");
+        }
+        var gedx = new GedcomX(), fields = getFields($table), person = GedcomX.Person({
+          id,
+          principal: true,
+          identifiers: {
+            "genscrape": getRecordIdentifier(id)
+          }
+        }), relatives = {};
+        gedx.addPerson(person);
+        var fullName = clean(fields["Full name (at birth)"]), lineage = clean(fields["Lineage"]);
+        if (fullName) {
+          if (lineage && lineage !== "?" && fullName.length > lineage.length + 1 && fullName.slice(-lineage.length - 1) === " " + lineage) {
+            person.addNameFromParts({
+              "http://gedcomx.org/Given": fullName.slice(0, -lineage.length - 1),
+              "http://gedcomx.org/Surname": lineage
+            });
+          } else {
+            person.addSimpleName(fullName);
+          }
+        }
+        setGender(person, fields["Sex"]);
+        var parentsCell = findParentsCell($table);
+        if (parentsCell) {
+          toArray(parentsCell.querySelectorAll("p.event")).forEach(function(p) {
+            var parent = getRelative(gedx, relatives, p);
+            if (parent) {
+              addRelationship(gedx, "http://gedcomx.org/ParentChild", parent, person);
+            }
+          });
+        }
+        toArray($content.children).filter(function(el) {
+          return el.tagName === "P" && el.classList.contains("event");
+        }).forEach(function(p) {
+          var event = parseEvent(p);
+          if (!event) {
+            return;
+          }
+          var type = event.type;
+          if (type === "child birth") {
+            var child = getRelative(gedx, relatives, p);
+            if (child) {
+              addRelationship(gedx, "http://gedcomx.org/ParentChild", person, child);
+            }
+          } else if (type === "marriage" || type === "divorce" || type === "partnership" || type === "engagement") {
+            var spouse = getRelative(gedx, relatives, p), factType = type === "marriage" ? "http://gedcomx.org/Marriage" : type === "divorce" ? "http://gedcomx.org/Divorce" : null, fact = factType ? createFact(factType, event) : null;
+            if (spouse) {
+              var rel = addRelationship(gedx, "http://gedcomx.org/Couple", person, spouse);
+              if (fact) {
+                rel.addFact(fact);
+              }
+            }
+            if (fact) {
+              person.addFact(createFact(factType, event));
+            }
+          } else if (factTypes[type]) {
+            var f = createFact(factTypes[type], event);
+            if (f) {
+              person.addFact(f);
+            }
+          }
+        });
+        gedx.addAgent(GedcomX.Agent().setId("agent").addName({
+          lang: "en",
+          value: "Rodovid"
+        }).setHomepage({
+          resource: "https://rodovid.org"
+        }));
+        gedx.addSourceDescriptionToAll({
+          about: document.location.href,
+          titles: [
+            {
+              value: document.title
+            }
+          ],
+          citations: [
+            {
+              value: document.title + " (" + document.location.href + " : accessed " + utils.getDateString() + ")"
+            }
+          ],
+          repository: {
+            resource: "#agent"
+          }
+        });
+        emitter.emit("data", gedx);
+      }
+      function toArray(list) {
+        return Array.prototype.slice.call(list);
+      }
+      function clean(str) {
+        return (str || "").replace(/\s+/g, " ").trim();
+      }
+      function getFields($table) {
+        var fields = {};
+        toArray($table.querySelectorAll("tr")).forEach(function(tr) {
+          var $label = tr.querySelector("td.fld"), $value = $label && $label.nextElementSibling;
+          if ($label && $value) {
+            fields[clean($label.textContent)] = clean($value.textContent);
+          }
+        });
+        return fields;
+      }
+      function findParentsCell($table) {
+        var cells = toArray($table.querySelectorAll("td[colspan]"));
+        for (var i = 0; i < cells.length; i++) {
+          var b = cells[i].querySelector("b");
+          if (b && clean(b.textContent) === "Parents") {
+            return cells[i];
+          }
+        }
+      }
+      function setGender(person, sex) {
+        switch ((sex || "").toLowerCase()) {
+          case "male":
+            person.setGender({ type: "http://gedcomx.org/Male" });
+            break;
+          case "female":
+            person.setGender({ type: "http://gedcomx.org/Female" });
+            break;
+        }
+      }
+      function parseEvent(p) {
+        var $date = p.querySelector("b"), text = clean(p.textContent), date = $date ? cleanDate($date.textContent) : "";
+        if ($date) {
+          text = clean(text.replace(clean($date.textContent), ""));
+        }
+        var colon = text.indexOf(":");
+        if (colon === -1) {
+          return null;
+        }
+        var type = text.slice(0, colon).trim().toLowerCase(), value = text.slice(colon + 1).trim(), places = toArray(p.querySelectorAll('a[href*="/wk/Place:"]')).map(function(a) {
+          return clean(a.textContent);
+        }).filter(function(s) {
+          return s && s !== "?";
+        });
+        return {
+          type,
+          date,
+          place: places.join(", "),
+          value
+        };
+      }
+      function cleanDate(str) {
+        str = clean(str);
+        if (/^(about|before|after|\?)?$/i.test(str)) {
+          return "";
+        }
+        return str;
+      }
+      function createFact(type, event) {
+        var fact = GedcomX.Fact({ type });
+        if (event.date) {
+          fact.setDate({ original: event.date });
+        }
+        if (event.place) {
+          fact.setPlace({ original: event.place });
+        }
+        if (valueFactTypes.indexOf(type) !== -1 && event.value) {
+          fact.setValue(event.value);
+        }
+        if (!event.date && !event.place && !fact.getValue()) {
+          return;
+        }
+        return fact;
+      }
+      function getRelative(gedx, relatives, el) {
+        var $link = el.querySelector('a[href*="/wk/Person:"]');
+        if (!$link) {
+          return;
+        }
+        var id = getRecordId($link.getAttribute("href"));
+        if (!id) {
+          return;
+        }
+        if (relatives[id]) {
+          return relatives[id];
+        }
+        var relative = GedcomX.Person({
+          id,
+          identifiers: {
+            "genscrape": getRecordIdentifier(id)
+          }
+        });
+        var name = clean($link.textContent).replace(/\?/g, "").replace(/\(\s*\)/g, "");
+        relative.addSimpleName(clean(name));
+        var $gender = $link.previousElementSibling;
+        if ($gender) {
+          var symbol = clean($gender.textContent);
+          setGender(relative, symbol === "\u2642" ? "male" : symbol === "\u2640" ? "female" : "");
+        }
+        var after = clean(getTextAfter($link)), born = after.match(/(?:^|\s)b\. (.*?)(?= d\. |$)/), died = after.match(/(?:^|\s)d\. (.*)$/);
+        if (born && cleanDate(born[1])) {
+          relative.addFact(GedcomX.Fact({
+            type: "http://gedcomx.org/Birth",
+            date: { original: cleanDate(born[1]) }
+          }));
+        }
+        if (died && cleanDate(died[1])) {
+          relative.addFact(GedcomX.Fact({
+            type: "http://gedcomx.org/Death",
+            date: { original: cleanDate(died[1]) }
+          }));
+        }
+        gedx.addPerson(relative);
+        relatives[id] = relative;
+        return relative;
+      }
+      function getTextAfter($el) {
+        var text = "", node = $el.nextSibling;
+        while (node) {
+          text += node.textContent;
+          node = node.nextSibling;
+        }
+        return text;
+      }
+      function addRelationship(gedx, type, person1, person2) {
+        var existing = gedx.getRelationships().filter(function(r) {
+          return r.getType() === type && r.getPerson1().getResource() === "#" + person1.getId() && r.getPerson2().getResource() === "#" + person2.getId();
+        })[0];
+        if (existing) {
+          return existing;
+        }
+        var rel = GedcomX.Relationship({
+          type,
+          person1,
+          person2
+        });
+        gedx.addRelationship(rel);
+        return rel;
+      }
+      function getRecordId(url) {
+        var match = (url || "").match(/Person:(\d+)/);
+        return match ? match[1] : void 0;
+      }
+      function getRecordIdentifier(id) {
+        return "genscrape://rodovid/" + id;
+      }
+    }
+  });
+
+  // src/scrapers/geneanet.js
+  var require_geneanet = __commonJS({
+    "src/scrapers/geneanet.js"(exports, module) {
+      var debug = require_browser()("genscrape:scrapers:geneanet");
+      var utils = require_utils2();
+      var GedcomX = require_src();
+      var urls = [
+        /^https?:\/\/gw\.geneanet\.org\/[^\/?#]+\?(?=[^#]*[?&]n=)(?=[^#]*[?&]p=)(?![^#]*[?&]m=)/
+      ];
+      var eventTypes = [
+        [/^(Born|N[ée]e?)\b\s*/i, "http://gedcomx.org/Birth"],
+        [/^(Baptized|Baptis[ée]e?)\b\s*/i, "http://gedcomx.org/Baptism"],
+        [/^(Deceased|D[ée]c[ée]d[ée]e?)\b\s*/i, "http://gedcomx.org/Death"],
+        [/^(Buried|Inhum[ée]e?)\b\s*/i, "http://gedcomx.org/Burial"],
+        [/^(Cremated|Incin[ée]r[ée]e?)\b\s*/i, "http://gedcomx.org/Cremation"]
+      ];
+      module.exports = function(register) {
+        register(urls, run);
+      };
+      function run(emitter) {
+        debug("run");
+        var $perso = document.getElementById("perso"), $h1 = $perso && $perso.querySelector("h1.name"), info = parseLink(document.location.href);
+        if (!$perso || !$h1 || !info) {
+          return emitter.emit("noData");
+        }
+        var gedx = new GedcomX(), person = GedcomX.Person({
+          id: info.id,
+          principal: true,
+          identifiers: {
+            "genscrape": getRecordIdentifier(info.id)
+          }
+        }), relatives = {};
+        gedx.addPerson(person);
+        var given = "", surname = "";
+        toArray($h1.querySelectorAll("a")).forEach(function(a) {
+          var href = a.getAttribute("href") || "", text = clean(a.textContent);
+          if (/[?&]m=P(&|$)/.test(href)) {
+            given = text;
+          } else if (/[?&]m=N(&|$)/.test(href)) {
+            surname = text;
+          }
+        });
+        if (given || surname) {
+          person.addNameFromParts({
+            "http://gedcomx.org/Given": given,
+            "http://gedcomx.org/Surname": surname
+          });
+        }
+        var $sex = $h1.querySelector("img");
+        if ($sex) {
+          var src = $sex.getAttribute("src") || "";
+          if (/female/.test(src)) {
+            person.setGender({ type: "http://gedcomx.org/Female" });
+          } else if (/male/.test(src)) {
+            person.setGender({ type: "http://gedcomx.org/Male" });
+          }
+        }
+        var $titleBlock = document.getElementById("person-title"), $events = $titleBlock && nextElement($titleBlock.parentNode.parentNode, "ul") || $perso.querySelector("ul");
+        if ($events) {
+          toArray($events.children).forEach(function(li) {
+            var fact = parseEvent(clean(li.textContent));
+            if (fact) {
+              person.addFact(fact);
+            }
+          });
+        }
+        toArray($perso.querySelectorAll("h2")).forEach(function(h2) {
+          var heading = clean(h2.textContent), $ul = nextElement(h2, "ul");
+          if (!$ul) {
+            return;
+          }
+          if (/^Parents$/i.test(heading)) {
+            toArray($ul.children).forEach(function(li) {
+              var parent = getRelative(gedx, relatives, directLink(li));
+              if (parent) {
+                addRelationship(gedx, "http://gedcomx.org/ParentChild", parent, person);
+              }
+            });
+          } else if (/^(Spouses?|Conjoints?|Mariages?|Unions?|Marriages?)\b/i.test(heading)) {
+            toArray($ul.children).forEach(function(li) {
+              var spouse = getRelative(gedx, relatives, directLink(li));
+              if (!spouse) {
+                return;
+              }
+              var rel = addRelationship(gedx, "http://gedcomx.org/Couple", person, spouse), marriage = parseMarriage(li);
+              if (marriage) {
+                rel.addFact(marriage);
+                person.addFact(parseMarriage(li));
+              }
+              var $children = li.querySelector("ul");
+              if ($children) {
+                toArray($children.children).forEach(function(childLi) {
+                  var child = getRelative(gedx, relatives, directLink(childLi));
+                  if (child) {
+                    addRelationship(gedx, "http://gedcomx.org/ParentChild", person, child);
+                    addRelationship(gedx, "http://gedcomx.org/ParentChild", spouse, child);
+                  }
+                });
+              }
+            });
+          }
+        });
+        gedx.addAgent(GedcomX.Agent().setId("agent").addName({
+          lang: "en",
+          value: "Geneanet"
+        }).setHomepage({
+          resource: "https://www.geneanet.org"
+        }));
+        gedx.addSourceDescriptionToAll({
+          about: document.location.href,
+          titles: [
+            {
+              value: document.title
+            }
+          ],
+          citations: [
+            {
+              value: document.title + " (" + document.location.href + " : accessed " + utils.getDateString() + ")"
+            }
+          ],
+          repository: {
+            resource: "#agent"
+          }
+        });
+        emitter.emit("data", gedx);
+      }
+      function toArray(list) {
+        return Array.prototype.slice.call(list);
+      }
+      function clean(str) {
+        return (str || "").replace(/\s+/g, " ").trim();
+      }
+      function nextElement($el, tag) {
+        var el = $el.nextElementSibling;
+        while (el) {
+          if (el.tagName.toLowerCase() === tag) {
+            return el;
+          }
+          if (el.tagName === "H2") {
+            return;
+          }
+          el = el.nextElementSibling;
+        }
+      }
+      function directLink(li) {
+        var children = toArray(li.children);
+        for (var i = 0; i < children.length; i++) {
+          if (children[i].tagName === "A") {
+            return children[i];
+          }
+        }
+      }
+      function parseLink(href) {
+        if (!href) {
+          return;
+        }
+        var parts = href.replace(/#.*$/, "").split("?"), user = parts[0].split("/").pop(), query = {};
+        (parts[1] || "").split("&").forEach(function(pair) {
+          var kv = pair.split("=");
+          try {
+            query[kv[0]] = decodeURIComponent((kv[1] || "").replace(/\+/g, " "));
+          } catch (e) {
+            query[kv[0]] = kv[1];
+          }
+        });
+        if (!user || !query.n || !query.p) {
+          return;
+        }
+        var id = [user, query.n, query.p];
+        if (query.oc && query.oc !== "0") {
+          id.push(query.oc);
+        }
+        return {
+          id: id.join(".").replace(/\s+/g, "_"),
+          n: query.n,
+          p: query.p,
+          oc: query.oc
+        };
+      }
+      function cleanDate(date) {
+        return clean(date).replace(/\s*\([^)]*\)/g, "").replace(/^(on|in|le|en|vers)\s+/i, "").trim();
+      }
+      function parseEvent(text) {
+        for (var i = 0; i < eventTypes.length; i++) {
+          if (eventTypes[i][0].test(text)) {
+            var rest = text.replace(eventTypes[i][0], ""), dash = rest.indexOf(" - "), date = dash === -1 ? rest : rest.slice(0, dash), place = dash === -1 ? "" : rest.slice(dash + 3);
+            place = place.replace(/,?\s*(aged|âgée?)\s.*$/i, "");
+            if (dash === -1) {
+              date = date.replace(/,?\s*(aged|âgée?)\s.*$/i, "");
+            }
+            date = cleanDate(date);
+            place = clean(place);
+            if (!date && !place) {
+              return;
+            }
+            var fact = GedcomX.Fact({ type: eventTypes[i][1] });
+            if (date) {
+              fact.setDate({ original: date });
+            }
+            if (place) {
+              fact.setPlace({ original: place });
+            }
+            return fact;
+          }
+        }
+      }
+      function parseMarriage(li) {
+        var text = "", node = li.firstChild;
+        while (node && node !== directLink(li)) {
+          text += node.textContent;
+          node = node.nextSibling;
+        }
+        text = clean(text);
+        var match = text.match(/^(Married|Mari[ée]e?)\s*(.*?)\s*(?:to|à|avec)?$/i);
+        if (!match) {
+          return;
+        }
+        var rest = match[2].replace(/\s+(to|à|avec)$/i, ""), dash = rest.indexOf(" - "), date = cleanDate(dash === -1 ? rest : rest.slice(0, dash)), place = dash === -1 ? "" : clean(rest.slice(dash + 3));
+        var fact = GedcomX.Fact({ type: "http://gedcomx.org/Marriage" });
+        if (date) {
+          fact.setDate({ original: date });
+        }
+        if (place) {
+          fact.setPlace({ original: place });
+        }
+        return fact;
+      }
+      function getRelative(gedx, relatives, $link) {
+        if (!$link) {
+          return;
+        }
+        var info = parseLink($link.getAttribute("href"));
+        if (!info) {
+          return;
+        }
+        if (relatives[info.id]) {
+          return relatives[info.id];
+        }
+        var relative = GedcomX.Person({
+          id: info.id,
+          identifiers: {
+            "genscrape": getRecordIdentifier(info.id)
+          }
+        });
+        relative.addSimpleName(clean($link.textContent));
+        var $bdo = $link.nextElementSibling;
+        while ($bdo && $bdo.tagName !== "BDO") {
+          if ($bdo.tagName === "A") {
+            $bdo = null;
+            break;
+          }
+          $bdo = $bdo.nextElementSibling;
+        }
+        if ($bdo) {
+          var life = clean($bdo.textContent).split("-"), born = clean(life[0]), died = clean(life[1]);
+          if (born) {
+            relative.addFact(GedcomX.Fact({
+              type: "http://gedcomx.org/Birth",
+              date: { original: born }
+            }));
+          }
+          if (died) {
+            relative.addFact(GedcomX.Fact({
+              type: "http://gedcomx.org/Death",
+              date: { original: died }
+            }));
+          }
+        }
+        gedx.addPerson(relative);
+        relatives[info.id] = relative;
+        return relative;
+      }
+      function addRelationship(gedx, type, person1, person2) {
+        var existing = gedx.getRelationships().filter(function(r) {
+          return r.getType() === type && r.getPerson1().getResource() === "#" + person1.getId() && r.getPerson2().getResource() === "#" + person2.getId();
+        })[0];
+        if (existing) {
+          return existing;
+        }
+        var rel = GedcomX.Relationship({
+          type,
+          person1,
+          person2
+        });
+        gedx.addRelationship(rel);
+        return rel;
+      }
+      function getRecordIdentifier(id) {
+        return "genscrape://geneanet/" + id;
+      }
+    }
+  });
+
+  // src/scrapers/geni.js
+  var require_geni = __commonJS({
+    "src/scrapers/geni.js"(exports, module) {
+      var debug = require_browser()("genscrape:scrapers:geni");
+      var utils = require_utils2();
+      var GedcomX = require_src();
+      var urls = [
+        /^https?:\/\/(www\.)?geni\.com\/people\/[^\/?#]+\/\d+/
+      ];
+      module.exports = function(register) {
+        register(urls, run);
+      };
+      function run(emitter) {
+        debug("run");
+        var id = getRecordId(document.location.href), $birth = document.getElementById("birth_date"), $table = findTable($birth) || document.querySelector("table.data_table"), $name = document.querySelector('[itemprop="mainEntity"] > h1[itemprop="name"]') || document.querySelector('h1[itemprop="name"]');
+        if (!id || !$table || !$name) {
+          return emitter.emit("noData");
+        }
+        var gedx = new GedcomX(), person = GedcomX.Person({
+          id,
+          principal: true,
+          identifiers: {
+            "genscrape": getRecordIdentifier(id)
+          }
+        }), relatives = {}, rows = getRows($table);
+        gedx.addPerson(person);
+        person.addSimpleName(baseName($name.textContent));
+        var birthDate = rows["Birthdate"] && clean(rows["Birthdate"].textContent), birthPlace = rows["Birthplace"] && clean(rows["Birthplace"].textContent);
+        addFact(person, "http://gedcomx.org/Birth", birthDate, birthPlace);
+        if (rows["Death"]) {
+          var death = parseDeath(rows["Death"]);
+          addFact(person, "http://gedcomx.org/Death", death.date, death.place);
+        }
+        if (rows["Place of Burial"]) {
+          addFact(person, "http://gedcomx.org/Burial", null, clean(rows["Place of Burial"].textContent));
+        }
+        if (rows["Christening"] || rows["Baptism"]) {
+          var $bap = rows["Christening"] || rows["Baptism"];
+          addFact(
+            person,
+            $bap === rows["Christening"] ? "http://gedcomx.org/Christening" : "http://gedcomx.org/Baptism",
+            null,
+            clean($bap.textContent)
+          );
+        }
+        if (rows["Occupation"]) {
+          var occupation = clean(rows["Occupation"].textContent);
+          if (occupation) {
+            person.addFact({
+              type: "http://gedcomx.org/Occupation",
+              value: occupation
+            });
+          }
+        }
+        if (rows["Immediate Family"]) {
+          parseFamily(gedx, person, relatives, rows["Immediate Family"]);
+        }
+        gedx.addAgent(GedcomX.Agent().setId("agent").addName({
+          lang: "en",
+          value: "Geni"
+        }).setHomepage({
+          resource: "https://www.geni.com"
+        }));
+        gedx.addSourceDescriptionToAll({
+          about: document.location.href,
+          titles: [
+            {
+              value: document.title
+            }
+          ],
+          citations: [
+            {
+              value: document.title + " (" + document.location.href + " : accessed " + utils.getDateString() + ")"
+            }
+          ],
+          repository: {
+            resource: "#agent"
+          }
+        });
+        emitter.emit("data", gedx);
+      }
+      function baseName(name) {
+        name = clean(name);
+        var base = name.split(",")[0].trim();
+        return base.indexOf(" ") !== -1 ? base : name;
+      }
+      function findTable($el) {
+        while ($el && $el.tagName !== "TABLE") {
+          $el = $el.parentNode;
+        }
+        return $el || null;
+      }
+      function toArray(list) {
+        return Array.prototype.slice.call(list);
+      }
+      function clean(str) {
+        return (str || "").replace(/\s+/g, " ").trim();
+      }
+      function getRows($table) {
+        var rows = {};
+        toArray($table.querySelectorAll("tr")).forEach(function(tr) {
+          var cells = toArray(tr.children).filter(function(c) {
+            return c.tagName === "TD" || c.tagName === "TH";
+          });
+          if (cells.length === 2) {
+            var label = clean(cells[0].textContent).replace(/:$/, "");
+            if (label) {
+              rows[label] = cells[1];
+            }
+          }
+        });
+        return rows;
+      }
+      function parseDeath($cell) {
+        var $date = $cell.querySelector('[itemprop="deathDate"]'), date = $date ? clean($date.textContent) : "", place = "", parts = $cell.innerHTML.split(/<br\s*\/?>/i);
+        if (parts.length > 1) {
+          var tmp = new DOMParser().parseFromString(parts.slice(1).join(" "), "text/html").body;
+          place = clean(tmp.textContent).replace(/\s*\([^()]*\)$/, "");
+        } else if (!$date) {
+          date = clean($cell.textContent).replace(/\s*\(\d+\)$/, "");
+        }
+        return { date, place };
+      }
+      function addFact(person, type, date, place) {
+        if (!date && !place) {
+          return;
+        }
+        var fact = GedcomX.Fact({ type });
+        if (date) {
+          fact.setDate({ original: date });
+        }
+        if (place) {
+          fact.setPlace({ original: place });
+        }
+        person.addFact(fact);
+      }
+      function parseFamily(gedx, person, relatives, $cell) {
+        var lines = [[]];
+        toArray($cell.querySelectorAll("p")).forEach(function($p) {
+          toArray($p.childNodes).forEach(function(node) {
+            if (node.nodeType === 1 && node.tagName === "BR") {
+              lines.push([]);
+            } else {
+              lines[lines.length - 1].push(node);
+            }
+          });
+        });
+        lines.forEach(function(nodes) {
+          var label = clean(nodes.filter(function(n) {
+            return n.nodeType === 3;
+          }).map(function(n) {
+            return n.textContent;
+          })[0] || "");
+          var links = [];
+          nodes.forEach(function(n) {
+            if (n.nodeType !== 1) {
+              return;
+            }
+            if (n.tagName === "A") {
+              links.push(n);
+            } else {
+              toArray(n.querySelectorAll("a")).forEach(function(a) {
+                links.push(a);
+              });
+            }
+          });
+          links = links.filter(function(a) {
+            return /geni\.com\/people\/[^\/]+\/\d+/.test(a.getAttribute("href") || "");
+          });
+          if (!label || !links.length) {
+            return;
+          }
+          var lower = label.toLowerCase().replace(/\s+of$/, "");
+          if (/^(biological |adopted |foster |step)?(son|daughter|child)$/.test(lower)) {
+            var parentType = /^biological/.test(lower) ? "http://gedcomx.org/BiologicalParent" : /^adopted/.test(lower) ? "http://gedcomx.org/AdoptiveParent" : /^foster/.test(lower) ? "http://gedcomx.org/FosterParent" : null;
+            if (/^step/.test(lower)) {
+              return;
+            }
+            if (/daughter/.test(lower)) {
+              person.setGender({ type: "http://gedcomx.org/Female" });
+            } else if (/son/.test(lower)) {
+              person.setGender({ type: "http://gedcomx.org/Male" });
+            }
+            links.forEach(function(a) {
+              var parent = getRelative(gedx, relatives, a);
+              if (parent) {
+                var rel = addRelationship(gedx, "http://gedcomx.org/ParentChild", parent, person);
+                if (parentType && !rel.getFacts().length) {
+                  rel.addFact({ type: parentType });
+                }
+              }
+            });
+          } else if (/^(husband|wife|partner|ex-husband|ex-wife|ex-partner)$/.test(lower)) {
+            if (lower === "husband") {
+              person.setGender({ type: "http://gedcomx.org/Male" });
+            } else if (lower === "wife") {
+              person.setGender({ type: "http://gedcomx.org/Female" });
+            }
+            links.forEach(function(a) {
+              var spouse = getRelative(gedx, relatives, a);
+              if (spouse) {
+                addRelationship(gedx, "http://gedcomx.org/Couple", person, spouse);
+              }
+            });
+          } else if (/^(father|mother|parent)$/.test(lower)) {
+            if (lower === "father") {
+              person.setGender({ type: "http://gedcomx.org/Male" });
+            } else if (lower === "mother") {
+              person.setGender({ type: "http://gedcomx.org/Female" });
+            }
+            links.forEach(function(a) {
+              var child = getRelative(gedx, relatives, a);
+              if (child) {
+                addRelationship(gedx, "http://gedcomx.org/ParentChild", person, child);
+              }
+            });
+          }
+        });
+      }
+      function getRelative(gedx, relatives, $link) {
+        var id = getRecordId($link.getAttribute("href"));
+        if (!id) {
+          return;
+        }
+        if (relatives[id]) {
+          return relatives[id];
+        }
+        var relative = GedcomX.Person({
+          id,
+          identifiers: {
+            "genscrape": getRecordIdentifier(id)
+          }
+        });
+        relative.addSimpleName(baseName($link.textContent));
+        gedx.addPerson(relative);
+        relatives[id] = relative;
+        return relative;
+      }
+      function addRelationship(gedx, type, person1, person2) {
+        var existing = gedx.getRelationships().filter(function(r) {
+          return r.getType() === type && r.getPerson1().getResource() === "#" + person1.getId() && r.getPerson2().getResource() === "#" + person2.getId();
+        })[0];
+        if (existing) {
+          return existing;
+        }
+        var rel = GedcomX.Relationship({
+          type,
+          person1,
+          person2
+        });
+        gedx.addRelationship(rel);
+        return rel;
+      }
+      function getRecordId(url) {
+        var match = (url || "").match(/geni\.com\/people\/[^\/?#]+\/(\d+)/);
+        return match ? match[1] : void 0;
+      }
+      function getRecordIdentifier(id) {
+        return "genscrape://geni/" + id;
+      }
+    }
+  });
+
+  // src/scrapers/digitalarkivet.js
+  var require_digitalarkivet = __commonJS({
+    "src/scrapers/digitalarkivet.js"(exports, module) {
+      var debug = require_browser()("genscrape:scrapers:digitalarkivet");
+      var utils = require_utils2();
+      var GedcomX = require_src();
+      var urls = [
+        /^https?:\/\/(?:www\.)?digitalarkivet\.no\/(?:[a-z]{2}\/)?(?:census\/person\/pf\d+|view\/\d+\/p[a-z]\d+)/
+      ];
+      module.exports = function(register) {
+        register(urls, run);
+      };
+      function run(emitter) {
+        debug("run");
+        var values = getLabeledValues(document.querySelector(".left-view-column") || document), recordId = getRecordId(), isCensus = /\/census\/person\//.test(document.location.href), recordPrefix = recordId.substr(0, 2), gedx = new GedcomX(), person = GedcomX.Person({
+          principal: true,
+          id: recordId,
+          identifiers: {
+            "genscrape": getRecordIdentifier(recordId)
+          }
+        }), sourceTitle;
+        gedx.addPerson(person);
+        var gender = clean(values["Gender"]);
+        if (gender === "m") {
+          person.setGender({ type: "http://gedcomx.org/Male" });
+        } else if (gender === "k") {
+          person.setGender({ type: "http://gedcomx.org/Female" });
+        }
+        if (isCensus) {
+          sourceTitle = processCensus(gedx, person, values);
+        } else {
+          sourceTitle = processChurchRecord(gedx, person, values, recordPrefix);
+        }
+        if (!person.getNames().length) {
+          emitter.emit("noData");
+          return;
+        }
+        gedx.addAgent(GedcomX.Agent().setId("agent").addName({
+          lang: "en",
+          value: "Digitalarkivet (The Digital Archive)"
+        }).setHomepage({
+          resource: "https://www.digitalarkivet.no"
+        }));
+        var name = person.getNames()[0].getNameForms()[0].getFullText() || "", title = name + (sourceTitle ? " - " + sourceTitle : "");
+        gedx.addSourceDescriptionToAll({
+          about: document.location.href,
+          titles: [
+            {
+              value: title
+            }
+          ],
+          citations: [
+            {
+              value: '"' + (sourceTitle || "Digitalarkivet") + '," database, Digitalarkivet, The National Archives of Norway (' + document.location.href + " : accessed " + utils.getDateString() + "), entry for " + name + "."
+            }
+          ],
+          repository: {
+            resource: "#agent"
+          }
+        });
+        emitter.emit("data", gedx);
+      }
+      function processCensus(gedx, person, values) {
+        var h1 = document.querySelector("h1"), fullName = h1 ? h1.textContent.replace(/^\s*Person:\s*/, "").replace(/^\s*\d+\s+/, "").replace(/\s+/g, " ").trim() : "", sourceLink = document.querySelector('.da-breadcrumb a[href*="/source/"]'), sourceTitle = sourceLink ? sourceLink.textContent.trim() : "", yearMatch = /(\d{4})/.exec(sourceTitle), municipalityMatch = /census for (.+)$/i.exec(sourceTitle), residenceLink = document.querySelector('.da-breadcrumb a[href*="residence/"]'), residence = residenceLink ? residenceLink.textContent.replace(/^\s*\d+\w*\s+/, "").trim() : "", place = [residence, municipalityMatch ? municipalityMatch[1].trim() : "", "Norway"].filter(Boolean).join(", ");
+        person.addSimpleName(fullName);
+        addFact(person, "http://gedcomx.org/Birth", clean(values["Date of birth"]), clean(values["Place of birth"]));
+        if (yearMatch) {
+          addFact(person, "http://gedcomx.org/Census", yearMatch[1], place);
+          addFact(person, "http://gedcomx.org/Residence", yearMatch[1], place);
+        }
+        addFact(person, "http://gedcomx.org/Occupation", null, null, clean(values["Occupation"]));
+        addFact(person, "http://gedcomx.org/MaritalStatus", null, null, clean(values["Marital status"]));
+        var familyPosition = clean(values["Family position"]), members = [], parents = [], spouse, children = [];
+        Array.from(document.querySelectorAll("#accordion-persons .data-item")).forEach(function(item) {
+          var link = item.querySelector("h4 a");
+          if (!link) {
+            return;
+          }
+          var id = getRecordIdFromUrl(link.href);
+          if (id === person.getId()) {
+            return;
+          }
+          var itemValues = getLabeledValues(item);
+          if (clean(itemValues["H.no."]) !== clean(values["Household no."])) {
+            return;
+          }
+          var position = clean(itemValues["Family position"]), relative = GedcomX.Person({
+            id,
+            identifiers: {
+              "genscrape": getRecordIdentifier(id)
+            }
+          }).addSimpleName(link.textContent.replace(/\s+/g, " ").replace(/^\s*\d+\s+/, "").trim()), born = clean(itemValues["Age/born"]);
+          if (/^\d{4}(-\d\d-\d\d)?$/.test(born || "")) {
+            addFact(relative, "http://gedcomx.org/Birth", born, clean(itemValues["Place of birth"]));
+          }
+          if (position === "hf" || position === "s") {
+            relative.setGender({ type: "http://gedcomx.org/Male" });
+          } else if (position === "hm" || position === "d") {
+            relative.setGender({ type: "http://gedcomx.org/Female" });
+          }
+          members.push({ position, person: relative });
+        });
+        var heads = members.filter(function(m) {
+          return m.position === "hf";
+        }).length + (familyPosition === "hf" ? 1 : 0), mothers = members.filter(function(m) {
+          return m.position === "hm";
+        }).length + (familyPosition === "hm" ? 1 : 0);
+        if (heads <= 1 && mothers <= 1) {
+          members.forEach(function(member) {
+            var position = member.position;
+            if (familyPosition === "s" || familyPosition === "d") {
+              if (position === "hf" || position === "hm") {
+                parents.push(member.person);
+              }
+            } else if (familyPosition === "hf" && position === "hm" || familyPosition === "hm" && position === "hf") {
+              spouse = member.person;
+            } else if ((familyPosition === "hf" || familyPosition === "hm") && (position === "s" || position === "d")) {
+              children.push(member.person);
+            }
+          });
+        }
+        parents.forEach(function(parent) {
+          gedx.addPerson(parent);
+          gedx.addRelationship({
+            type: "http://gedcomx.org/ParentChild",
+            person1: parent,
+            person2: person
+          });
+        });
+        if (parents.length === 2) {
+          gedx.addRelationship({
+            type: "http://gedcomx.org/Couple",
+            person1: parents[0],
+            person2: parents[1]
+          });
+        }
+        if (spouse) {
+          gedx.addPerson(spouse);
+          gedx.addRelationship({
+            type: "http://gedcomx.org/Couple",
+            person1: person,
+            person2: spouse
+          });
+        }
+        children.forEach(function(child) {
+          gedx.addPerson(child);
+          gedx.addRelationship({
+            type: "http://gedcomx.org/ParentChild",
+            person1: person,
+            person2: child
+          });
+          if (spouse) {
+            gedx.addRelationship({
+              type: "http://gedcomx.org/ParentChild",
+              person1: spouse,
+              person2: child
+            });
+          }
+        });
+        return sourceTitle;
+      }
+      function processChurchRecord(gedx, person, values, prefix) {
+        var infobox = document.querySelector(".infobox"), sourceTitle = infobox ? utils.maybe(infobox.querySelector("p.ssp-semibold")).textContent : "", infoValues = infobox ? getLabeledValues(infobox) : {}, eventLink = infobox ? infobox.querySelector(".parent p a") : null, eventDate = eventLink ? eventLink.textContent.trim() : "", role = clean(values["Role"]), givenName = cleanName(values["Given name"]), surname = cleanName(values["Last name"]);
+        sourceTitle = sourceTitle ? sourceTitle.replace(/\s+/g, " ").trim() : "";
+        if (givenName || surname) {
+          person.addNameFromParts({
+            "http://gedcomx.org/Given": givenName,
+            "http://gedcomx.org/Surname": surname
+          });
+          person.getNames()[0].getNameForms()[0].setFullText([givenName, surname].filter(Boolean).join(" "));
+        } else {
+          var h1 = document.querySelector("h1");
+          if (h1) {
+            person.addSimpleName(cleanName(h1.textContent.replace(/^\s*Person:\s*/, "")));
+          }
+        }
+        var eventPlace = clean(values["Parish/Church"]) || clean(infoValues["Parish/Church"]) || firstGeographicArea(infobox);
+        if (eventPlace) {
+          eventPlace = [eventPlace, clean(infoValues["County"]), "Norway"].filter(Boolean).join(", ");
+        }
+        addFact(person, "http://gedcomx.org/Birth", combineDate(clean(values["Date of birth"]), clean(values["Birth year"])), clean(values["Birth place"]));
+        addFact(person, "http://gedcomx.org/Residence", null, clean(values["Residence"]));
+        switch (prefix) {
+          // Births and baptisms
+          case "pd":
+            if (role === "barn") {
+              addFact(person, "http://gedcomx.org/Baptism", eventDate || combineDate(clean(values["Baptism date"]), clean(values["Year"])), eventPlace);
+              processFamily(gedx, person, "barn");
+            } else if (role === "far" || role === "mor") {
+              processFamily(gedx, person, role);
+            }
+            break;
+          // Deaths and burials
+          case "pg":
+            addFact(person, "http://gedcomx.org/Death", combineDate(clean(values["Date of death"]), clean(values["Year of death"])), null);
+            addFact(person, "http://gedcomx.org/Burial", eventDate || combineDate(clean(values["Burial date"]), clean(values["Year"])), eventPlace);
+            break;
+          // Confirmations
+          case "pk":
+            addFact(person, "http://gedcomx.org/Confirmation", eventDate, eventPlace);
+            break;
+          // Marriages
+          case "pv":
+            processMarriage(gedx, person, role, eventDate || combineDate(clean(values["Marriage date"]), clean(values["Year"])), eventPlace);
+            break;
+        }
+        return sourceTitle;
+      }
+      function processFamily(gedx, person, role) {
+        var father, mother, child;
+        getInvolved().forEach(function(entry) {
+          if (entry.current) {
+            return;
+          }
+          if (entry.role === "far" && !father) {
+            father = createInvolvedPerson(entry, "http://gedcomx.org/Male");
+          } else if (entry.role === "mor" && !mother) {
+            mother = createInvolvedPerson(entry, "http://gedcomx.org/Female");
+          } else if (entry.role === "barn" && !child) {
+            child = createInvolvedPerson(entry);
+          }
+        });
+        if (role === "barn") {
+          if (father) {
+            gedx.addPerson(father);
+            gedx.addRelationship({ type: "http://gedcomx.org/ParentChild", person1: father, person2: person });
+          }
+          if (mother) {
+            gedx.addPerson(mother);
+            gedx.addRelationship({ type: "http://gedcomx.org/ParentChild", person1: mother, person2: person });
+          }
+          if (father && mother) {
+            gedx.addRelationship({ type: "http://gedcomx.org/Couple", person1: father, person2: mother });
+          }
+        } else {
+          var other = role === "far" ? mother : father;
+          if (other) {
+            gedx.addPerson(other);
+            gedx.addRelationship({ type: "http://gedcomx.org/Couple", person1: person, person2: other });
+          }
+          if (child) {
+            gedx.addPerson(child);
+            gedx.addRelationship({ type: "http://gedcomx.org/ParentChild", person1: person, person2: child });
+            if (other) {
+              gedx.addRelationship({ type: "http://gedcomx.org/ParentChild", person1: other, person2: child });
+            }
+          }
+        }
+      }
+      function processMarriage(gedx, person, role, date, place) {
+        var spouse;
+        getInvolved().forEach(function(entry) {
+          if (!spouse && !entry.current && (entry.role === "brudgom" || entry.role === "brur")) {
+            spouse = createInvolvedPerson(entry, entry.role === "brudgom" ? "http://gedcomx.org/Male" : "http://gedcomx.org/Female");
+          }
+        });
+        if (role === "brudgom") {
+          person.setGender({ type: "http://gedcomx.org/Male" });
+        } else if (role === "brur") {
+          person.setGender({ type: "http://gedcomx.org/Female" });
+        }
+        if (spouse) {
+          gedx.addPerson(spouse);
+          var couple = GedcomX.Relationship({
+            type: "http://gedcomx.org/Couple",
+            person1: person,
+            person2: spouse
+          });
+          var fact = createFact("http://gedcomx.org/Marriage", date, place);
+          if (fact) {
+            couple.addFact(fact);
+          }
+          gedx.addRelationship(couple);
+        } else {
+          addFact(person, "http://gedcomx.org/Marriage", date, place);
+        }
+      }
+      function getInvolved() {
+        var entries = [];
+        Array.from(document.querySelectorAll(".left-view-column .data-item")).forEach(function(item) {
+          var v = getLabeledValues(item), link = item.querySelector("h4 a");
+          if (v["Role"] && v["Name"]) {
+            entries.push({
+              role: clean(v["Role"]),
+              name: cleanName(v["Name"]),
+              position: clean(v["Position"]),
+              birthYear: clean(v["Birth year"]),
+              birthPlace: clean(v["Birth place"]),
+              residence: clean(v["Residence"]),
+              id: link ? getRecordIdFromUrl(link.href) : null,
+              current: (" " + item.className + " ").indexOf(" current ") !== -1
+            });
+          }
+        });
+        return entries;
+      }
+      function createInvolvedPerson(entry, gender) {
+        if (!entry.name) {
+          return;
+        }
+        var person = GedcomX.Person().addSimpleName(entry.name);
+        if (entry.id) {
+          person.setId(entry.id);
+          person.setIdentifiers({ "genscrape": getRecordIdentifier(entry.id) });
+        }
+        if (gender) {
+          person.setGender({ type: gender });
+        }
+        addFact(person, "http://gedcomx.org/Birth", entry.birthYear, entry.birthPlace);
+        addFact(person, "http://gedcomx.org/Residence", null, entry.residence);
+        return person;
+      }
+      function firstGeographicArea(infobox) {
+        if (!infobox) {
+          return "";
+        }
+        var rows = Array.from(infobox.querySelectorAll(".row"));
+        for (var i = 0; i < rows.length; i++) {
+          if (/^Geographic area/.test(rows[i].textContent.trim())) {
+            var html = rows[i].children[1] ? rows[i].children[1].innerHTML : "", first = html.split(/<br\s*\/?>/i)[0].replace(/<[^>]+>/g, "").trim();
+            return first.replace(/\s+parish$/i, "");
+          }
+        }
+        return "";
+      }
+      function combineDate(date, year) {
+        if (date && /^\d{4}/.test(date)) {
+          return date;
+        }
+        if (year && date) {
+          return year + "-" + date;
+        }
+        return year || void 0;
+      }
+      function createFact(type, date, place, value) {
+        if (!date && !place && !value) {
+          return;
+        }
+        var fact = GedcomX.Fact({ type });
+        if (date) {
+          fact.setDate({ original: date });
+        }
+        if (place) {
+          fact.setPlace({ original: place });
+        }
+        if (value) {
+          fact.setValue(value);
+        }
+        return fact;
+      }
+      function addFact(person, type, date, place, value) {
+        var fact = createFact(type, date, place, value);
+        if (fact) {
+          person.addFact(fact);
+        }
+      }
+      function getLabeledValues(root) {
+        var map = {};
+        Array.from(root.querySelectorAll(".ssp-semibold")).forEach(function(valueEl) {
+          var labelEl = valueEl.previousElementSibling;
+          if (labelEl && labelEl.className.indexOf("ssp-semibold") === -1) {
+            var label = labelEl.textContent.replace(/\s+/g, " ").trim().replace(/:$/, "");
+            if (label && map[label] === void 0) {
+              map[label] = valueEl.textContent.replace(/\s+/g, " ").trim();
+            }
+          }
+        });
+        return map;
+      }
+      function clean(value) {
+        if (value === void 0 || value === null) {
+          return void 0;
+        }
+        value = value.replace(/\s+/g, " ").trim();
+        return value && value !== "-" ? value : void 0;
+      }
+      function cleanName(value) {
+        value = clean(value);
+        if (value) {
+          value = value.replace(/!+/g, "").replace(/^[?\s]+/, "").replace(/\s+/g, " ").trim();
+        }
+        return value || void 0;
+      }
+      function getRecordId() {
+        var id = getRecordIdFromUrl(document.location.href), permanent = document.getElementById("permanentId");
+        if (permanent && permanent.textContent.trim()) {
+          id = permanent.textContent.trim();
+        }
+        return id;
+      }
+      function getRecordIdFromUrl(url) {
+        var match = /\/(p[a-z]\d+)(?:[\/?#]|$)/.exec(url || "");
+        return match ? match[1] : "";
+      }
+      function getRecordIdentifier(id) {
+        return "genscrape://digitalarkivet/" + id;
+      }
+    }
+  });
+
+  // src/scrapers/legacy.js
+  var require_legacy = __commonJS({
+    "src/scrapers/legacy.js"(exports, module) {
+      var debug = require_browser()("genscrape:scrapers:legacy");
+      var utils = require_utils2();
+      var GedcomX = require_src();
+      var urls = [
+        /^https?:\/\/(?:www\.)?legacy\.com\/(?:[a-z]{2}\/)?obituaries\/(?:[\w-]+\/)?name\/[^?#]*-obituary\?(?:[^#]*&)?id=\d+/
+      ];
+      var monthNames = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ];
+      module.exports = function(register) {
+        register(urls, run);
+      };
+      function run(emitter) {
+        debug("run");
+        var data = getJsonLd(), $person = data.Person, article = data.NewsArticle;
+        if (!$person || !($person.name || $person.givenName || $person.familyName)) {
+          return emitter.emit("noData");
+        }
+        var id = getRecordId(), gedx = new GedcomX(), person = GedcomX.Person({
+          principal: true,
+          id,
+          identifiers: {
+            "genscrape": "genscrape://legacy/" + id
+          }
+        });
+        var given = [$person.givenName, $person.additionalName].filter(Boolean).join(" "), surname = $person.familyName, fullName = ($person.name || [given, surname].filter(Boolean).join(" ")).replace(/\s+/g, " ").trim();
+        if (given || surname) {
+          person.addNameFromParts({
+            "http://gedcomx.org/Given": given,
+            "http://gedcomx.org/Surname": surname
+          });
+          person.getNames()[0].getNameForms()[0].setFullText(fullName);
+        } else {
+          person.addSimpleName(fullName);
+        }
+        var years = /\((\d{4}) - (\d{4})\)/.exec(article && article.headline || document.title || ""), birthDate = $person.birthDate ? formatDate($person.birthDate) : years ? years[1] : void 0, deathDate = $person.deathDate ? formatDate($person.deathDate) : years ? years[2] : void 0;
+        if (birthDate) {
+          person.addFact({
+            type: "http://gedcomx.org/Birth",
+            date: {
+              original: birthDate
+            }
+          });
+        }
+        var deathPlace = formatPlace($person.deathPlace);
+        if (deathDate || deathPlace) {
+          var death = GedcomX.Fact({ type: "http://gedcomx.org/Death" });
+          if (deathDate) {
+            death.setDate({ original: deathDate });
+          }
+          if (deathPlace) {
+            death.setPlace({ original: deathPlace });
+          }
+          person.addFact(death);
+        }
+        gedx.addPerson(person);
+        gedx.addAgent(GedcomX.Agent().setId("agent").addName({
+          lang: "en",
+          value: "Legacy.com"
+        }).setHomepage({
+          resource: "https://www.legacy.com"
+        }));
+        var title = article && article.headline || document.title || fullName + " Obituary", published = article && article.datePublished ? " published " + formatDate(article.datePublished) : "";
+        gedx.addSourceDescriptionToAll({
+          about: document.location.href,
+          titles: [
+            {
+              value: title
+            }
+          ],
+          citations: [
+            {
+              value: '"' + title + '," obituary' + published + ", Legacy.com (" + document.location.href + " : accessed " + utils.getDateString() + ")."
+            }
+          ],
+          repository: {
+            resource: "#agent"
+          }
+        });
+        emitter.emit("data", gedx);
+      }
+      function getJsonLd() {
+        var result = {};
+        Array.from(document.querySelectorAll('script[type="application/ld+json"]')).forEach(function(script) {
+          try {
+            var json = JSON.parse(script.textContent);
+            if (json && json["@type"] && !result[json["@type"]]) {
+              result[json["@type"]] = json;
+            }
+          } catch (e) {
+            debug("invalid json-ld");
+          }
+        });
+        return result;
+      }
+      function formatDate(value) {
+        var match = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(value || "");
+        if (match && monthNames[parseInt(match[2], 10) - 1]) {
+          return parseInt(match[3], 10) + " " + monthNames[parseInt(match[2], 10) - 1] + " " + match[1];
+        }
+        return value;
+      }
+      function formatPlace(place) {
+        var address = place && place.address;
+        if (!address) {
+          return;
+        }
+        return [address.addressLocality, address.addressRegion, address.addressCountry].filter(Boolean).join(", ") || void 0;
+      }
+      function getRecordId() {
+        var match = /[?&]id=(\d+)/.exec(document.location.search || document.location.href);
+        return match ? match[1] : "";
+      }
+    }
+  });
+
+  // src/scrapers/archieven.js
+  var require_archieven = __commonJS({
+    "src/scrapers/archieven.js"(exports, module) {
+      var debug = require_browser()("genscrape:scrapers:archieven");
+      var utils = require_utils2();
+      var GedcomX = require_src();
+      var urls = [
+        /^https?:\/\/(?:www\.)?archieven\.nl\/(?:[a-z]{2}\/)?zoeken\?(?=[^#]*[?&]minr=\d+)(?=[^#]*[?&]micode=)/
+      ];
+      var monthNames = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ];
+      var MALE = "http://gedcomx.org/Male";
+      var FEMALE = "http://gedcomx.org/Female";
+      module.exports = function(register) {
+        register(urls, run);
+      };
+      function run(emitter) {
+        debug("run");
+        var attempts = 0, interval = setInterval(function() {
+          attempts++;
+          if (hasRecord()) {
+            clearInterval(interval);
+            process2(emitter);
+          } else if (attempts >= 40) {
+            clearInterval(interval);
+            emitter.emit("noData");
+          }
+        }, 250);
+        if (hasRecord()) {
+          clearInterval(interval);
+          process2(emitter);
+        }
+      }
+      function hasRecord() {
+        return !!document.querySelector(".mi_record .mi_detailstable .mi_list_item");
+      }
+      function process2(emitter) {
+        var $record = document.querySelector(".mi_record"), rows = readRows($record), id = getRecordId(), gedx = new GedcomX(), principalRow, person;
+        ["kind", "overledene", "bruidegom"].forEach(function(label) {
+          if (!principalRow && rows[label]) {
+            principalRow = label;
+          }
+        });
+        if (!principalRow) {
+          return emitter.emit("noData");
+        }
+        person = createPerson(rows[principalRow], principalRow === "bruidegom" ? MALE : void 0);
+        if (!person) {
+          return emitter.emit("noData");
+        }
+        person.setPrincipal(true);
+        person.setId(id);
+        person.setIdentifiers({
+          "genscrape": "genscrape://archieven/" + getInstitution() + "/" + id
+        });
+        gedx.addPerson(person);
+        var gender = rows[principalRow].sub["Geslacht"];
+        if (gender === "Man") {
+          person.setGender({ type: MALE });
+        } else if (gender === "Vrouw") {
+          person.setGender({ type: FEMALE });
+        }
+        switch (principalRow) {
+          // Birth record
+          case "kind":
+            addFact(person, "http://gedcomx.org/Birth", rows["geboortedatum"], rows["geboorteplaats"]);
+            addParents(gedx, person, rows["vader"], rows["moeder"]);
+            break;
+          // Death record
+          case "overledene":
+            addFact(person, "http://gedcomx.org/Birth", null, rows["overledene"].sub["Geboorteplaats"] ? { value: rows["overledene"].sub["Geboorteplaats"] } : null);
+            addFact(person, "http://gedcomx.org/Death", rows["overlijdensdatum"], rows["overlijdensplaats"]);
+            addParents(gedx, person, rows["vader"], rows["moeder"]);
+            break;
+          // Marriage record
+          case "bruidegom":
+            addFact(person, "http://gedcomx.org/Birth", null, rows["bruidegom"].sub["Geboorteplaats"] ? { value: rows["bruidegom"].sub["Geboorteplaats"] } : null);
+            addOccupation(person, rows["bruidegom"]);
+            addParents(gedx, person, rows["vader bruidegom"], rows["moeder bruidegom"]);
+            var bride = createPerson(rows["bruid"], FEMALE);
+            if (bride) {
+              addFact(bride, "http://gedcomx.org/Birth", null, rows["bruid"].sub["Geboorteplaats"] ? { value: rows["bruid"].sub["Geboorteplaats"] } : null);
+              addOccupation(bride, rows["bruid"]);
+              gedx.addPerson(bride);
+              addParents(gedx, bride, rows["vader bruid"], rows["moeder bruid"]);
+              var couple = GedcomX.Relationship({
+                type: "http://gedcomx.org/Couple",
+                person1: person,
+                person2: bride
+              });
+              var marriage = createFact("http://gedcomx.org/Marriage", rows["huwelijksdatum"], rows["huwelijksplaats"]);
+              if (marriage) {
+                couple.addFact(marriage);
+              }
+              gedx.addRelationship(couple);
+            }
+            break;
+        }
+        gedx.addAgent(GedcomX.Agent().setId("agent").addName({
+          lang: "nl",
+          value: "Archieven.nl"
+        }).setHomepage({
+          resource: "https://www.archieven.nl"
+        }));
+        var title = text($record.querySelector(".mi_titlepart")) || document.title, series = text($record.querySelector(".mi_comlinks .mi_unittitle")), org = /Beherende organisatie:\s*([^\n]*?)\s*(?:laatste wijziging|$)/.exec(text($record.querySelector(".mi_record_det")) || "");
+        gedx.addSourceDescriptionToAll({
+          about: document.location.href,
+          titles: [
+            {
+              value: title
+            }
+          ],
+          citations: [
+            {
+              value: title + (series ? ", " + series : "") + (org ? ", " + org[1] : "") + ", Archieven.nl (" + document.location.href + " : accessed " + utils.getDateString() + ")."
+            }
+          ],
+          repository: {
+            resource: "#agent"
+          }
+        });
+        emitter.emit("data", gedx);
+      }
+      function readRows($record) {
+        var rows = {};
+        Array.from($record.querySelectorAll(".mi_detailstable > .mi_list_item")).forEach(function(item) {
+          var labelEl = item.querySelector(".mi_label"), valueEl = item.querySelector(".mi_flexvalue");
+          if (!labelEl || !valueEl) {
+            return;
+          }
+          var label = text(labelEl).replace(/:$/, "").toLowerCase(), sub = {};
+          Array.from(item.querySelectorAll(".mi_det_items .mi_details")).forEach(function(detail) {
+            var subLabel = detail.querySelector(".mi_label"), subValue = detail.querySelector(".mi_value");
+            if (subLabel && subValue) {
+              sub[text(subLabel).replace(/:$/, "")] = text(subValue);
+            }
+          });
+          if (rows[label] === void 0) {
+            rows[label] = {
+              value: textWithoutLinks(valueEl),
+              sub
+            };
+          }
+        });
+        return rows;
+      }
+      function createPerson(row, gender) {
+        if (!row || !row.value) {
+          return;
+        }
+        var person = GedcomX.Person(), given = row.sub["Voornaam"], surname = [row.sub["Tussenvoegsel"], row.sub["Achternaam"]].filter(Boolean).join(" ");
+        if (given || surname) {
+          person.addNameFromParts({
+            "http://gedcomx.org/Given": given,
+            "http://gedcomx.org/Surname": surname
+          });
+          person.getNames()[0].getNameForms()[0].setFullText(row.value);
+        } else {
+          person.addSimpleName(row.value);
+        }
+        if (gender) {
+          person.setGender({ type: gender });
+        }
+        return person;
+      }
+      function addParents(gedx, child, fatherRow, motherRow) {
+        var father = createPerson(fatherRow, MALE), mother = createPerson(motherRow, FEMALE);
+        if (father) {
+          addOccupation(father, fatherRow);
+          gedx.addPerson(father);
+          gedx.addRelationship({ type: "http://gedcomx.org/ParentChild", person1: father, person2: child });
+        }
+        if (mother) {
+          addOccupation(mother, motherRow);
+          gedx.addPerson(mother);
+          gedx.addRelationship({ type: "http://gedcomx.org/ParentChild", person1: mother, person2: child });
+        }
+        if (father && mother) {
+          gedx.addRelationship({ type: "http://gedcomx.org/Couple", person1: father, person2: mother });
+        }
+      }
+      function addOccupation(person, row) {
+        if (row && row.sub["Beroep"]) {
+          person.addFact({
+            type: "http://gedcomx.org/Occupation",
+            value: row.sub["Beroep"]
+          });
+        }
+      }
+      function createFact(type, dateRow, placeRow) {
+        var date = dateRow ? formatDate(dateRow.value) : null, place = placeRow ? placeRow.value : null;
+        if (!date && !place) {
+          return;
+        }
+        var fact = GedcomX.Fact({ type });
+        if (date) {
+          fact.setDate({ original: date });
+        }
+        if (place) {
+          fact.setPlace({ original: place });
+        }
+        return fact;
+      }
+      function addFact(person, type, dateRow, placeRow) {
+        var fact = createFact(type, dateRow, placeRow);
+        if (fact) {
+          person.addFact(fact);
+        }
+      }
+      function formatDate(value) {
+        var match = /^(\d{1,2})-(\d{1,2})-(\d{4})$/.exec(value || "");
+        if (match && monthNames[parseInt(match[2], 10) - 1]) {
+          return parseInt(match[1], 10) + " " + monthNames[parseInt(match[2], 10) - 1] + " " + match[3];
+        }
+        return value || void 0;
+      }
+      function text(el) {
+        return el ? el.textContent.replace(/\s+/g, " ").trim() : "";
+      }
+      function textWithoutLinks(el) {
+        var clone = el.cloneNode(true);
+        Array.from(clone.querySelectorAll("a, svg")).forEach(function(node) {
+          node.parentNode.removeChild(node);
+        });
+        return text(clone);
+      }
+      function getRecordId() {
+        var match = /[?&]minr=(\d+)/.exec(document.location.href);
+        return match ? match[1] : "";
+      }
+      function getInstitution() {
+        var match = /[?&]miadt=(\d+)/.exec(document.location.href);
+        return match ? match[1] : "0";
+      }
+    }
+  });
+
+  // src/scrapers/freereg.js
+  var require_freereg = __commonJS({
+    "src/scrapers/freereg.js"(exports, module) {
+      var debug = require_browser()("genscrape:scrapers:freereg");
+      var utils = require_utils2();
+      var GedcomX = require_src();
+      var urls = [
+        /^https?:\/\/www\.freereg\.org\.uk\/search_records\/[0-9a-f]{24}(\/|\?|#|$)/
+      ];
+      module.exports = function(register) {
+        register(urls, run);
+      };
+      var recordId;
+      function run(emitter) {
+        debug("run");
+        var fields = getFields(), type = getRecordType();
+        recordId = getRecordId(document.location.href);
+        debug("type: " + type);
+        if (!type || !recordId) {
+          return emitter.emit("noData");
+        }
+        var gedx = GedcomX(), principal;
+        switch (type) {
+          case "Baptism":
+            principal = processBaptism(gedx, fields);
+            break;
+          case "Marriage":
+            principal = processMarriage(gedx, fields);
+            break;
+          case "Burial":
+            principal = processBurial(gedx, fields);
+            break;
+        }
+        if (!principal) {
+          return emitter.emit("noData");
+        }
+        gedx.addAgent(GedcomX.Agent().setId("agent").addName({
+          lang: "en",
+          value: "FreeREG"
+        }).setHomepage({
+          resource: "https://www.freereg.org.uk"
+        }));
+        var title = type + " of " + getPrincipalName(principal) + (fields["County"] ? ", " + fields["Place"] + ", " + fields["County"] : "");
+        gedx.addSourceDescriptionToAll({
+          about: document.location.href,
+          titles: [
+            {
+              value: title
+            }
+          ],
+          citations: [
+            {
+              value: 'FreeREG, "' + title + '" (' + document.location.href + " : accessed " + utils.getDateString() + ")"
+            }
+          ],
+          repository: {
+            resource: "#agent"
+          }
+        });
+        emitter.emit("data", gedx);
+      }
+      function getPrincipalName(person) {
+        var name = person.getNames()[0];
+        return name ? name.getNameForms()[0].getFullText() : "";
+      }
+      function getRecordId(url) {
+        var match = url.match(/search_records\/([0-9a-f]{24})/);
+        return match ? match[1] : null;
+      }
+      function getRecordType() {
+        var $caption = document.querySelector("#results_detail_table caption");
+        if ($caption) {
+          var match = $caption.firstChild.textContent.match(/(Baptism|Marriage|Burial)/i);
+          if (match) {
+            return match[1].charAt(0).toUpperCase() + match[1].substring(1).toLowerCase();
+          }
+        }
+      }
+      function getFields() {
+        var fields = {};
+        Array.from(document.querySelectorAll("#results_detail_table tbody tr")).forEach(function($row) {
+          var $cells = $row.querySelectorAll("td");
+          if ($cells.length === 2) {
+            var label = clean($cells[0].firstChild ? $cells[0].firstChild.textContent : $cells[0].textContent), value = clean($cells[1].textContent);
+            if (label && value) {
+              fields[label] = value;
+            }
+          }
+        });
+        return fields;
+      }
+      function clean(text) {
+        return text.replace(/\s+/g, " ").trim();
+      }
+      function markPrincipal(person) {
+        person.setPrincipal(true);
+        person.setId(recordId);
+        person.setIdentifiers({
+          "genscrape": "genscrape://freereg/" + recordId
+        });
+      }
+      function createPerson(forename, surname, sex) {
+        if (!forename && !surname) {
+          return;
+        }
+        var person = GedcomX.Person().addNameFromParts({
+          "http://gedcomx.org/Given": forename,
+          "http://gedcomx.org/Surname": surname
+        });
+        var fullText = [forename, surname].filter(Boolean).join(" ");
+        person.getNames()[0].getNameForms()[0].setFullText(fullText);
+        if (sex === "M") {
+          person.setGender({ type: "http://gedcomx.org/Male" });
+        } else if (sex === "F") {
+          person.setGender({ type: "http://gedcomx.org/Female" });
+        }
+        return person;
+      }
+      function getEventPlace(fields) {
+        return [fields["Church name"], fields["Place"], fields["County"]].filter(Boolean).join(", ");
+      }
+      function addEventFact(person, type, date, place) {
+        if (date || place) {
+          var fact = GedcomX.Fact({ type });
+          if (date) {
+            fact.setDate({ original: date });
+          }
+          if (place) {
+            fact.setPlace({ original: place });
+          }
+          person.addFact(fact);
+        }
+      }
+      function addAbode(person, abode) {
+        if (abode) {
+          person.addFact({
+            type: "http://gedcomx.org/Residence",
+            place: { original: abode }
+          });
+        }
+      }
+      function addOccupation(person, occupation) {
+        if (occupation) {
+          person.addFact({
+            type: "http://gedcomx.org/Occupation",
+            value: occupation
+          });
+        }
+      }
+      function addParentChild(gedx, parent, child) {
+        gedx.addPerson(parent);
+        gedx.addRelationship({
+          type: "http://gedcomx.org/ParentChild",
+          person1: parent,
+          person2: child
+        });
+      }
+      function addParents(gedx, child, fields, prefix) {
+        var father = createPerson(fields[prefix + "Father forename"], fields[prefix + "Father surname"], "M"), mother = createPerson(fields[prefix + "Mother forename"], fields[prefix + "Mother surname"], "F");
+        if (father) {
+          addOccupation(father, fields[prefix + "Father occupation"]);
+          addAbode(father, fields[prefix + "Father abode"]);
+          addParentChild(gedx, father, child);
+        }
+        if (mother) {
+          addOccupation(mother, fields[prefix + "Mother occupation"]);
+          addParentChild(gedx, mother, child);
+        }
+        if (father && mother) {
+          gedx.addRelationship({
+            type: "http://gedcomx.org/Couple",
+            person1: father,
+            person2: mother
+          });
+        }
+      }
+      function processBaptism(gedx, fields) {
+        var child = createPerson(fields["Person forename"], fields["Person surname"] || fields["Father surname"], fields["Person sex"]);
+        if (!child) {
+          return;
+        }
+        addEventFact(child, "http://gedcomx.org/Baptism", fields["Baptism date"], getEventPlace(fields));
+        addAbode(child, fields["Person abode"]);
+        markPrincipal(child);
+        gedx.addPerson(child);
+        addParents(gedx, child, fields, "");
+        return child;
+      }
+      function processBurial(gedx, fields) {
+        var person = createPerson(fields["Burial person forename"], fields["Burial person surname"], fields["Person sex"]);
+        if (!person) {
+          return;
+        }
+        addEventFact(person, "http://gedcomx.org/Burial", fields["Burial date"], getEventPlace(fields));
+        addAbode(person, fields["Burial person abode"]);
+        markPrincipal(person);
+        gedx.addPerson(person);
+        var relationship = (fields["Relationship"] || "").toLowerCase(), relatives = [
+          createPerson(fields["Male relative forename"], fields["Relative surname"], "M"),
+          createPerson(fields["Female relative forename"], fields["Relative surname"], "F")
+        ];
+        relatives.forEach(function(relative) {
+          if (!relative) {
+            return;
+          }
+          gedx.addPerson(relative);
+          if (/^(son|daughter|child|infant)/.test(relationship)) {
+            gedx.addRelationship({
+              type: "http://gedcomx.org/ParentChild",
+              person1: relative,
+              person2: person
+            });
+          } else if (/^(wife|husband|widow|wid)/.test(relationship)) {
+            gedx.addRelationship({
+              type: "http://gedcomx.org/Couple",
+              person1: person,
+              person2: relative
+            });
+          }
+        });
+        return person;
+      }
+      function processMarriage(gedx, fields) {
+        var groom = createPerson(fields["Groom forename"], fields["Groom surname"], "M"), bride = createPerson(fields["Bride forename"], fields["Bride surname"], "F");
+        if (!groom && !bride) {
+          return;
+        }
+        markPrincipal(groom || bride);
+        var date = fields["Marriage date"], place = getEventPlace(fields);
+        [[groom, "Groom "], [bride, "Bride "]].forEach(function(pair) {
+          var person = pair[0];
+          if (person) {
+            addAbode(person, fields[pair[1] + "abode"]);
+            addOccupation(person, fields[pair[1] + "occupation"]);
+            gedx.addPerson(person);
+            addParents(gedx, person, fields, pair[1]);
+          }
+        });
+        if (groom && bride) {
+          var couple = GedcomX.Relationship({
+            type: "http://gedcomx.org/Couple",
+            person1: groom,
+            person2: bride
+          });
+          addEventFact(couple, "http://gedcomx.org/Marriage", date, place);
+          gedx.addRelationship(couple);
+        }
+        Object.keys(fields).filter(function(label) {
+          return /^Witness\d*$/.test(label);
+        }).forEach(function(label) {
+          gedx.addPerson(GedcomX.Person().addSimpleName(fields[label]));
+        });
+        return groom || bride;
+      }
+    }
+  });
+
+  // src/scrapers/freecen.js
+  var require_freecen = __commonJS({
+    "src/scrapers/freecen.js"(exports, module) {
+      var debug = require_browser()("genscrape:scrapers:freecen");
+      var utils = require_utils2();
+      var GedcomX = require_src();
+      var urls = [
+        /^https?:\/\/www\.freecen\.org\.uk\/search_records\/[0-9a-f]{24}(\/|\?|#|$)/
+      ];
+      module.exports = function(register) {
+        register(urls, run);
+      };
+      function run(emitter) {
+        debug("run");
+        var recordId = getRecordId(document.location.href), location = getTableRows(findTable("location"))[0], people = getTableRows(findTable("each person"), true);
+        debug("people: " + people.length);
+        if (!recordId || !location || !people.length) {
+          return emitter.emit("noData");
+        }
+        var gedx = GedcomX(), censusPlace = getCensusPlace(location), head, principal;
+        var created = people.map(function(row) {
+          row.person = createPerson(row, location["Census"], censusPlace);
+          return row;
+        });
+        principal = (created.filter(function(row) {
+          return row.isPrincipal && row.person;
+        })[0] || created.filter(function(row) {
+          return row.person;
+        })[0] || {}).person;
+        if (!principal) {
+          return emitter.emit("noData");
+        }
+        principal.setPrincipal(true);
+        principal.setId(recordId);
+        principal.setIdentifiers({
+          "genscrape": "genscrape://freecen/" + recordId
+        });
+        created.forEach(function(row) {
+          var person = row.person;
+          if (!person) {
+            return;
+          }
+          gedx.addPerson(person);
+          if (!head && /^head$/i.test(row["Relationship"])) {
+            head = person;
+          }
+        });
+        if (head) {
+          people.forEach(function(row) {
+            if (row.person && row.person !== head) {
+              addRelationship(gedx, head, row.person, row["Relationship"]);
+            }
+          });
+        }
+        gedx.addAgent(GedcomX.Agent().setId("agent").addName({
+          lang: "en",
+          value: "FreeCEN"
+        }).setHomepage({
+          resource: "https://www.freecen.org.uk"
+        }));
+        var name = principal.getNames()[0].getNameForms()[0].getFullText(), title = location["Census"] + " census, " + name + ", " + censusPlace;
+        gedx.addSourceDescriptionToAll({
+          about: document.location.href,
+          titles: [
+            {
+              value: title
+            }
+          ],
+          citations: [
+            {
+              value: 'FreeCEN, "' + title + '" (' + document.location.href + " : accessed " + utils.getDateString() + ")"
+            }
+          ],
+          repository: {
+            resource: "#agent"
+          }
+        });
+        emitter.emit("data", gedx);
+      }
+      function getRecordId(url) {
+        var match = url.match(/search_records\/([0-9a-f]{24})/);
+        return match ? match[1] : null;
+      }
+      function clean(text) {
+        return text.replace(/\s+/g, " ").trim();
+      }
+      function findTable(keyword) {
+        var tables = Array.from(document.querySelectorAll("table")), result;
+        tables.forEach(function($table) {
+          var $caption = $table.querySelector("caption");
+          if (!result && $caption && $caption.textContent.indexOf(keyword) !== -1) {
+            result = $table;
+          }
+        });
+        return result;
+      }
+      function getTableRows($table) {
+        if (!$table) {
+          return [];
+        }
+        var headers = Array.from($table.querySelectorAll("th")).map(function($th) {
+          return clean($th.textContent);
+        }).filter(Boolean);
+        return Array.from($table.querySelectorAll("tbody tr")).map(function($tr) {
+          var row = {}, $cells = $tr.querySelectorAll("td");
+          if ($cells.length !== headers.length) {
+            return null;
+          }
+          headers.forEach(function(header, i) {
+            var $flag = $cells[i].querySelector(".accessibility");
+            if ($flag) {
+              row.isPrincipal = true;
+              $flag.parentNode.removeChild($flag);
+            }
+            row[header] = clean($cells[i].textContent);
+          });
+          return row;
+        }).filter(Boolean);
+      }
+      function getCensusPlace(location) {
+        var parts = [location["House Number"], location["House or Street Name"]].filter(Boolean).join(" ");
+        return [
+          parts,
+          location["Civil Parish"],
+          location["District"],
+          location["County"].replace(/\s*\([A-Z]+\)$/, "")
+        ].filter(Boolean).filter(function(part, i, arr) {
+          return arr.indexOf(part) === i;
+        }).join(", ");
+      }
+      function createPerson(row, year, censusPlace) {
+        var forenames = row["Forenames"], surname = row["Surname"];
+        if (!forenames && !surname) {
+          return;
+        }
+        var person = GedcomX.Person().addNameFromParts({
+          "http://gedcomx.org/Given": forenames,
+          "http://gedcomx.org/Surname": surname
+        });
+        person.getNames()[0].getNameForms()[0].setFullText([forenames, surname].filter(Boolean).join(" "));
+        if (row["Sex"] === "M") {
+          person.setGender({ type: "http://gedcomx.org/Male" });
+        } else if (row["Sex"] === "F") {
+          person.setGender({ type: "http://gedcomx.org/Female" });
+        }
+        person.addFact({
+          type: "http://gedcomx.org/Census",
+          date: { original: year },
+          place: { original: censusPlace }
+        });
+        var birthPlace = [row["Birth Place"], row["Birth County"]].filter(Boolean).join(", "), age = parseInt(row["Age"], 10), birthFact = GedcomX.Fact({ type: "http://gedcomx.org/Birth" });
+        if (birthPlace) {
+          birthFact.setPlace({ original: birthPlace });
+        }
+        if (!isNaN(age) && /^\d+$/.test(row["Age"]) && parseInt(year, 10)) {
+          birthFact.setDate({ original: "about " + (parseInt(year, 10) - age) });
+        }
+        if (birthFact.getDate() || birthFact.getPlace()) {
+          person.addFact(birthFact);
+        }
+        if (row["Occupation"]) {
+          person.addFact({
+            type: "http://gedcomx.org/Occupation",
+            value: row["Occupation"]
+          });
+        }
+        if (row["Marital Status"]) {
+          person.addFact({
+            type: "http://gedcomx.org/MaritalStatus",
+            value: row["Marital Status"]
+          });
+        }
+        return person;
+      }
+      function addRelationship(gedx, head, person, relationship) {
+        relationship = (relationship || "").toLowerCase();
+        if (/^(wife|wf|husband|hus|spouse)$/.test(relationship)) {
+          gedx.addRelationship({
+            type: "http://gedcomx.org/Couple",
+            person1: head,
+            person2: person
+          });
+        } else if (/^(son|dau|daur|daughter|child|chd)$/.test(relationship)) {
+          gedx.addRelationship({
+            type: "http://gedcomx.org/ParentChild",
+            person1: head,
+            person2: person
+          });
+        } else if (/^(father|fa|mother|mo)$/.test(relationship)) {
+          gedx.addRelationship({
+            type: "http://gedcomx.org/ParentChild",
+            person1: person,
+            person2: head
+          });
+        }
+      }
+    }
+  });
+
+  // src/scrapers/irishgenealogy.js
+  var require_irishgenealogy = __commonJS({
+    "src/scrapers/irishgenealogy.js"(exports, module) {
+      var debug = require_browser()("genscrape:scrapers:irishgenealogy");
+      var utils = require_utils2();
+      var GedcomX = require_src();
+      var urls = [
+        /^https?:\/\/(www\.)?irishgenealogy\.ie\/view\/?\?(.*&)?record_id=[^&#]+/
+      ];
+      var months = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+      ];
+      module.exports = function(register) {
+        register(urls, run);
+      };
+      var recordId;
+      function run(emitter) {
+        debug("run");
+        recordId = getRecordId(document.location.href);
+        var $title = document.querySelector("h3"), title = $title ? clean($title.textContent) : "", typeMatch = title.match(/^(Birth|Death|Marriage|Baptism|Burial) record for/i);
+        if (!recordId || !typeMatch) {
+          return emitter.emit("noData");
+        }
+        var type = typeMatch[1].charAt(0).toUpperCase() + typeMatch[1].substring(1).toLowerCase(), rows = getRows(), location = getLocation(), eventDate = getTitleDate(title), gedx = GedcomX(), principal;
+        debug("type: " + type);
+        switch (type) {
+          case "Birth":
+            principal = processCivilBirth(gedx, rows, location);
+            break;
+          case "Death":
+            principal = processCivilDeath(gedx, rows, location);
+            break;
+          case "Baptism":
+            principal = processBaptism(gedx, rows, location, eventDate);
+            break;
+          case "Burial":
+            principal = processBurial(gedx, rows, location, eventDate);
+            break;
+          case "Marriage":
+            if (rows["Party 1 Name"]) {
+              principal = processCivilMarriage(gedx, rows, location);
+            } else {
+              principal = processChurchMarriage(gedx, rows, location, eventDate);
+            }
+            break;
+        }
+        if (!principal) {
+          return emitter.emit("noData");
+        }
+        gedx.addAgent(GedcomX.Agent().setId("agent").addName({
+          lang: "en",
+          value: "IrishGenealogy.ie"
+        }).setHomepage({
+          resource: "https://www.irishgenealogy.ie"
+        }));
+        var sourceTitle = title.replace(/\s+/g, " ");
+        gedx.addSourceDescriptionToAll({
+          about: document.location.href,
+          titles: [
+            {
+              value: sourceTitle
+            }
+          ],
+          citations: [
+            {
+              value: 'IrishGenealogy.ie, "' + sourceTitle + '" (' + document.location.href + " : accessed " + utils.getDateString() + ")"
+            }
+          ],
+          repository: {
+            resource: "#agent"
+          }
+        });
+        emitter.emit("data", gedx);
+      }
+      function getRecordId(url) {
+        var match = url.match(/[?&]record_id=([^&#]+)/);
+        return match ? decodeURIComponent(match[1]) : null;
+      }
+      function clean(text) {
+        return text.replace(/\s+/g, " ").trim();
+      }
+      function value(text) {
+        text = clean(text || "");
+        if (/^(N\/?R|N\/?A|Null|NR NR|N\/R N\/R)$/i.test(text)) {
+          return "";
+        }
+        return text;
+      }
+      function getRows() {
+        var rows = {};
+        Array.from(document.querySelectorAll("#result-details tr")).forEach(function($tr) {
+          var $cells = $tr.querySelectorAll("td"), label;
+          if ($cells.length === 2) {
+            label = clean($cells[0].textContent).replace(/:$/, "");
+            rows[label] = value($cells[1].textContent);
+          } else if ($cells.length === 3) {
+            label = clean($cells[0].textContent).replace(/:$/, "");
+            if (label) {
+              rows[label] = [value($cells[1].textContent), value($cells[2].textContent)];
+            }
+          }
+        });
+        return rows;
+      }
+      function getLocation() {
+        var $span = document.querySelector("span.mb-0"), text = $span ? clean($span.textContent) : "", match = text.match(/^Area - (.*?), Parish\/Church\/Congregation - (.*)$/);
+        if (match) {
+          return match[2] + ", " + match[1];
+        }
+        return text.replace(/^\/\s*/, "");
+      }
+      function getTitleDate(title) {
+        var match = title.match(/\s(?:on|in)\s+(\d.*)$/);
+        return match ? clean(match[1]) : "";
+      }
+      function formatCivilDate(date) {
+        var match = (date || "").match(/^(\d\d)\/(\d\d)\/(\d{4})$/);
+        if (match && months[parseInt(match[2], 10) - 1]) {
+          return parseInt(match[1], 10) + " " + months[parseInt(match[2], 10) - 1] + " " + match[3];
+        }
+        return date;
+      }
+      function createPerson(name, sex) {
+        if (!name) {
+          return;
+        }
+        var person = GedcomX.Person().addSimpleName(name);
+        if (sex === "M") {
+          person.setGender({ type: "http://gedcomx.org/Male" });
+        } else if (sex === "F") {
+          person.setGender({ type: "http://gedcomx.org/Female" });
+        }
+        return person;
+      }
+      function markPrincipal(person) {
+        person.setPrincipal(true);
+        person.setId(recordId);
+        person.setIdentifiers({
+          "genscrape": "genscrape://irishgenealogy/" + recordId
+        });
+      }
+      function addFact(holder, type, date, place) {
+        if (date || place) {
+          var fact = GedcomX.Fact({ type });
+          if (date) {
+            fact.setDate({ original: date });
+          }
+          if (place) {
+            fact.setPlace({ original: place });
+          }
+          holder.addFact(fact);
+        }
+      }
+      function addResidence(person, address) {
+        if (address) {
+          person.addFact({
+            type: "http://gedcomx.org/Residence",
+            place: { original: address }
+          });
+        }
+      }
+      function addOccupation(person, occupation) {
+        if (occupation) {
+          person.addFact({
+            type: "http://gedcomx.org/Occupation",
+            value: occupation
+          });
+        }
+      }
+      function addParents(gedx, child, fatherName, motherName) {
+        var father = createPerson(fatherName, "M"), mother = createPerson(motherName, "F");
+        [father, mother].forEach(function(parent) {
+          if (parent) {
+            gedx.addPerson(parent);
+            gedx.addRelationship({
+              type: "http://gedcomx.org/ParentChild",
+              person1: parent,
+              person2: child
+            });
+          }
+        });
+        if (father && mother) {
+          gedx.addRelationship({
+            type: "http://gedcomx.org/Couple",
+            person1: father,
+            person2: mother
+          });
+        }
+      }
+      function addOthers(gedx, rows, labelPattern) {
+        Object.keys(rows).filter(function(label) {
+          return labelPattern.test(label) && typeof rows[label] === "string" && rows[label];
+        }).forEach(function(label) {
+          gedx.addPerson(createPerson(rows[label]));
+        });
+      }
+      function birthYearFromAge(year, age) {
+        var y = parseInt(year, 10), match = (age || "").match(/^(\d+)(\s*(yrs?|years?))?$/i);
+        if (y && match) {
+          return "about " + (y - parseInt(match[1], 10));
+        }
+      }
+      function processCivilBirth(gedx, rows, location) {
+        var person = createPerson(rows["Name"]);
+        if (!person) {
+          return;
+        }
+        addFact(person, "http://gedcomx.org/Birth", rows["Year of Birth"], location);
+        markPrincipal(person);
+        gedx.addPerson(person);
+        var maidenName = rows["Mother's Birth Surname"];
+        if (maidenName) {
+          var mother = GedcomX.Person().addNameFromParts({
+            "http://gedcomx.org/Surname": maidenName
+          });
+          mother.setGender({ type: "http://gedcomx.org/Female" });
+          gedx.addPerson(mother);
+          gedx.addRelationship({
+            type: "http://gedcomx.org/ParentChild",
+            person1: mother,
+            person2: person
+          });
+        }
+        return person;
+      }
+      function processCivilDeath(gedx, rows, location) {
+        var person = createPerson(rows["Name"]);
+        if (!person) {
+          return;
+        }
+        var deathDate = rows["Date of Death"], age = rows["Deceased Age at Death"], birthDate = birthYearFromAge(deathDate, age);
+        if (birthDate) {
+          addFact(person, "http://gedcomx.org/Birth", birthDate);
+        }
+        addFact(person, "http://gedcomx.org/Death", deathDate, location);
+        markPrincipal(person);
+        gedx.addPerson(person);
+        return person;
+      }
+      function processCivilMarriage(gedx, rows, location) {
+        var party1 = createPerson(rows["Party 1 Name"]), party2 = createPerson(rows["Party 2 Name"]);
+        if (!party1) {
+          return;
+        }
+        markPrincipal(party1);
+        gedx.addPerson(party1);
+        if (party2) {
+          gedx.addPerson(party2);
+          var couple = GedcomX.Relationship({
+            type: "http://gedcomx.org/Couple",
+            person1: party1,
+            person2: party2
+          });
+          addFact(couple, "http://gedcomx.org/Marriage", formatCivilDate(rows["Date of Event"]), location);
+          gedx.addRelationship(couple);
+        }
+        return party1;
+      }
+      function processBaptism(gedx, rows, location, date) {
+        var person = createPerson(rows["Name"]);
+        if (!person) {
+          return;
+        }
+        addFact(person, "http://gedcomx.org/Baptism", date, location);
+        addResidence(person, rows["Address"]);
+        markPrincipal(person);
+        gedx.addPerson(person);
+        addParents(gedx, person, rows["Father"], rows["Mother"]);
+        addOthers(gedx, rows, /^Sponsor \d+$/);
+        return person;
+      }
+      function processBurial(gedx, rows, location, date) {
+        var person = createPerson(rows["Name"]);
+        if (!person) {
+          return;
+        }
+        var deathDate = rows["Date of Death"], birthDate = birthYearFromAge((deathDate || date).match(/\d{4}/) ? (deathDate || date).match(/\d{4}/)[0] : "", rows["Age"]);
+        if (birthDate) {
+          addFact(person, "http://gedcomx.org/Birth", birthDate);
+        }
+        addFact(person, "http://gedcomx.org/Death", deathDate);
+        addFact(person, "http://gedcomx.org/Burial", date, location);
+        addResidence(person, rows["Address"]);
+        addOccupation(person, rows["Occupation"]);
+        markPrincipal(person);
+        gedx.addPerson(person);
+        return person;
+      }
+      function processChurchMarriage(gedx, rows, location, date) {
+        var names = rows["Name"] || [], groom = createPerson(names[0], "M"), bride = createPerson(names[1], "F");
+        if (!groom && !bride) {
+          return;
+        }
+        markPrincipal(groom || bride);
+        [groom, bride].forEach(function(person, i) {
+          if (person) {
+            addResidence(person, (rows["Address"] || [])[i]);
+            addOccupation(person, (rows["Occupation"] || [])[i]);
+            gedx.addPerson(person);
+            addParents(gedx, person, (rows["Father"] || [])[i], (rows["Mother"] || [])[i]);
+          }
+        });
+        if (groom && bride) {
+          var couple = GedcomX.Relationship({
+            type: "http://gedcomx.org/Couple",
+            person1: groom,
+            person2: bride
+          });
+          addFact(couple, "http://gedcomx.org/Marriage", date, location);
+          gedx.addRelationship(couple);
+        }
+        addOthers(gedx, rows, /^Witness \d+$/);
+        return groom || bride;
+      }
+    }
+  });
+
   // src/main.js
   var require_main = __commonJS({
     "src/main.js"(exports, module) {
       var debug = require_browser()("genscrape:main");
       var EventEmitter2 = require_eventemitter2().EventEmitter2;
-      var genscrape = function() {
+      var generic = require_generic();
+      var genscrape = function(options) {
+        options = options || {};
         var emitter = new EventEmitter2();
         var thisUrl = window.location.href;
         debug("url", thisUrl);
@@ -10420,7 +15701,20 @@ var genscrape = (() => {
         if (!match) {
           debug("no match");
           setTimeout(function() {
-            emitter.emit("noMatch");
+            var result = null;
+            if (options.generic !== false) {
+              try {
+                result = generic.extract(window.document, thisUrl);
+              } catch (e) {
+                debug("generic failed", e);
+              }
+            }
+            if (result && generic.isUsable(result.record)) {
+              debug("generic", result.strategy);
+              emitter.emit("data", result.gedx, { generic: true, strategy: result.strategy });
+            } else {
+              emitter.emit("noMatch");
+            }
           });
         }
         return emitter;
@@ -10452,6 +15746,22 @@ var genscrape = (() => {
       require_wikitree()(register);
       require_myheritage_record()(register);
       require_myheritage_person()(register);
+      require_fold3_memorial()(register);
+      require_abmc()(register);
+      require_cvwm()(register);
+      require_awm()(register);
+      require_familysearch_ancestors_public()(register);
+      require_thepeerage()(register);
+      require_gedbas()(register);
+      require_rodovid()(register);
+      require_geneanet()(register);
+      require_geni()(register);
+      require_digitalarkivet()(register);
+      require_legacy()(register);
+      require_archieven()(register);
+      require_freereg()(register);
+      require_freecen()(register);
+      require_irishgenealogy()(register);
     }
   });
   return require_main();
