@@ -53,6 +53,9 @@ Rendered from `promo/promo.html` (open it with `?size=tile|marquee|large`):
 | `promo/promo-tile-440x280.png` | 440×280 | Chrome small promo tile, Edge/Opera thumbnail |
 | `promo/promo-marquee-1400x560.png` | 1400×560 | Chrome marquee, Edge large promo |
 | `promo/promo-large-920x680.png` | 920×680 | Older 920×680 slots (Opera, Yandex) |
+| `promo/screenshot-1…5-*-1280x800.png` | 1280×800 | Store screenshots, in order (all stores) |
+
+Screenshots come from `promo/screenshot.html?shot=main|source|search|attach|citation`, which frames the app captures in `promo/screens/`. To refresh those captures, run `promo/screens/capture-app.py` against the local dev server (see the comment at its top).
 
 To re-render after editing the HTML:
 
