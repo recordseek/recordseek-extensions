@@ -26,8 +26,8 @@ WHAT RECORDSEEK DOES FOR YOU
 
 • One click from discovery to source. Works on any web page, not only genealogy sites.
 • Reads the record for you. On popular genealogy sites, RecordSeek picks up the person's name, dates, places and family members and uses them to search your tree.
-• Citations in the style you need: Evidence Explained, Chicago, NGSQ, MLA, APA or Harvard.
-• Tag what the source proves (name, gender, birth, christening, death, burial) and add a reason, so others know why it is attached.
+• Citations in the style you need, from the formats genealogists use to the common academic styles.
+• Tag the facts a source proves and add a reason, so others know why it is attached.
 • Remembers your choices, like citation style and whether to file sources in your Source Box.
 
 PRIVATE BY DESIGN
@@ -69,3 +69,9 @@ for spec in thumb:300:188 tile:440:280 marquee:1400:560 large:920:680; do
     --window-size=$w,$h --screenshot="$PWD/promo-$n-${w}x${h}.png" "file://$PWD/promo.html?size=$n"
 done
 ```
+
+## Store rules for this copy
+
+Chrome rejected 2.6.3 under **Yellow Argon** (excessive keywords) for listing citation style names
+(Evidence Explained, Chicago, NGSQ, MLA, APA, Harvard). Describe features in plain sentences. Don't list
+brand names, styles, site names or fact types as keyword lists in any store description.
