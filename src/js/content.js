@@ -110,11 +110,28 @@ function gx_set_relative(out, prefix, person) {
   out[prefix + 'Surname'] = gx_name_part(person, 'Surname');
 }
 
-// The main person: principal=true, else persons[0].
+// An ark/URL without protocol, www or query, for comparing identifiers.
+function gx_normalize_url(url) {
+  return typeof url === 'string' ? url.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/[?#].*$/, '') : '';
+}
+
+// The main person: principal=true, else the person whose persistent id is the
+// record the document describes (FamilySearch), else persons[0].
 function gx_main_person(data) {
-  var persons = (data && data.persons) || [];
-  for (var i = 0; i < persons.length; i++) {
+  var persons = (data && data.persons) || [], i, j;
+  for (i = 0; i < persons.length; i++) {
     if (persons[i].principal === true) return persons[i];
+  }
+  var desc = data && typeof data.description === 'string' ? data.description.replace(/^#/, '') : '';
+  var sources = (data && data.sourceDescriptions) || [], about = '';
+  for (i = 0; desc && i < sources.length; i++) {
+    if (sources[i].id === desc) about = gx_normalize_url(sources[i].about);
+  }
+  for (i = 0; about && i < persons.length; i++) {
+    var ids = (persons[i].identifiers && persons[i].identifiers['http://gedcomx.org/Persistent']) || [];
+    for (j = 0; j < ids.length; j++) {
+      if (gx_normalize_url(ids[j]) === about) return persons[i];
+    }
   }
   return persons[0];
 }

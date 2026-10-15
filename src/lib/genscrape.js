@@ -1,4 +1,4 @@
-/*! genscrape v1.6.0 (rootsdev/genscrape@05f45e98ee56decd3f76587855518b9993f0bc87) | MIT (c) Justin York | https://github.com/rootsdev/genscrape
+/*! genscrape v1.6.1 (rootsdev/genscrape@316cccd4703c437b727a69c6f5c597b102e529f0) | MIT (c) Justin York | https://github.com/rootsdev/genscrape
  * Patched: innerHTML writes on detached nodes replaced with DOMParser (inert parsing); AMD detection disabled so a page-level define() cannot capture dependencies.
  * Unminified build: npm install --omit=dev && npx esbuild@0.24.0 src/main.js --bundle --format=iife --global-name=genscrape --platform=browser --target=es2017 --legal-comments=inline --define:define=undefined */
 var genscrape = (() => {
@@ -8610,7 +8610,7 @@ var genscrape = (() => {
               var identifiers = person.getIdentifiers(), ark;
               if (identifiers) {
                 ark = identifiers.getValues("http://gedcomx.org/Persistent")[0];
-                if (ark && ark === url.replace("www.", "")) {
+                if (ark && normalizeArk(ark) === normalizeArk(url)) {
                   person.setPrincipal(true);
                 } else {
                   person.setPrincipal();
@@ -8632,6 +8632,9 @@ var genscrape = (() => {
             emitter.emit("data", gedx);
           }
         });
+      }
+      function normalizeArk(url) {
+        return url.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/[?#].*$/, "");
       }
     }
   });
