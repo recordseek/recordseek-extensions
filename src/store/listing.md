@@ -46,10 +46,11 @@ Productivity (Chrome, Edge) · Other / Search Tools (Firefox)
 
 ## Images
 
-Rendered from `promo/promo.html` (open it with `?size=tile|marquee|large`):
+Rendered from `promo/promo.html` (open it with `?size=thumb|tile|marquee|large`):
 
 | File | Size | Use |
 |---|---|---|
+| `promo/promo-thumb-300x188.png` | 300×188 | Small thumbnail slots (e.g. Opera, Whale) |
 | `promo/promo-tile-440x280.png` | 440×280 | Chrome small promo tile, Edge/Opera thumbnail |
 | `promo/promo-marquee-1400x560.png` | 1400×560 | Chrome marquee, Edge large promo |
 | `promo/promo-large-920x680.png` | 920×680 | Older 920×680 slots (Opera, Yandex) |
@@ -61,7 +62,7 @@ To re-render after editing the HTML:
 
 ```bash
 cd src/store/promo
-for spec in tile:440:280 marquee:1400:560 large:920:680; do
+for spec in thumb:300:188 tile:440:280 marquee:1400:560 large:920:680; do
   IFS=: read n w h <<< "$spec"
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --hide-scrollbars \
     --allow-file-access-from-files --force-device-scale-factor=1 --virtual-time-budget=4000 \

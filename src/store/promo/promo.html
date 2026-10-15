@@ -1,6 +1,6 @@
 <!doctype html>
 <!-- Store promo images. Render with scripts in this folder's README:
-     ?size=tile (440x280) | marquee (1400x560) | large (920x680) -->
+     ?size=thumb (300x188) | tile (440x280) | marquee (1400x560) | large (920x680) -->
 <html>
 <head>
 <meta charset="utf-8">
@@ -84,6 +84,14 @@
   .large h1 { position: relative; font-size: 52px; margin-top: 34px; max-width: 700px; }
   .large p.sub { position: relative; font-size: 20px; margin-top: 16px; max-width: 640px; }
   .large .card { left: 70px; right: 70px; bottom: 56px; }
+  /* ---- 300 x 188 thumbnail ---- */
+  .thumb { width: 300px; height: 188px; padding: 22px 22px; }
+  .thumb::before { width: 300px; height: 300px; right: -120px; top: -90px; }
+  .thumb .brand { gap: 8px; position: relative; }
+  .thumb .brand img { width: 34px; height: 34px; }
+  .thumb .word { font-size: 19px; }
+  .thumb h1 { position: relative; font-size: 27px; margin-top: 18px; }
+  .thumb p.sub { position: relative; font-size: 12.5px; margin-top: 9px; }
 </style>
 </head>
 <body>
@@ -108,6 +116,7 @@
       </div>
     </div>`;
   const copy = {
+    thumb: `${brand}<h1>Every discovery,<br><em>a proper source.</em></h1><p class="sub">Cite any record you find online in one click.</p>`,
     tile: `${brand}<h1>Every discovery,<br><em>a proper source.</em></h1><p class="sub">Cite any record you find online in one click.</p>`,
     marquee: `${brand}<h1>Every discovery deserves <em>to be kept.</em></h1><p class="sub">Turn any web page into a proper source citation and attach it to your family tree in FamilySearch or Ancestry.</p>${card}`,
     large: `${brand}<h1>One click from discovery<br><em>to source.</em></h1><p class="sub">Cite any record you find online and attach it to the right people in your tree.</p>${card}`,
