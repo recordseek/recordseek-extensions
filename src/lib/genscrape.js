@@ -850,11 +850,7 @@ var genscrape = (() => {
             return [];
           }
         };
-        if (false) {
-          (void 0)(function() {
-            return EventEmitter;
-          });
-        } else if (typeof exports === "object") {
+        if (typeof exports === "object") {
           module.exports = EventEmitter;
         } else {
           window.EventEmitter2 = EventEmitter;

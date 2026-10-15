@@ -1,4 +1,13 @@
 +---------+
+| 2.6.2   |
++---------+
+
+* genscrape 1.6.1: a generic extractor and new record scrapers.
+* FamilySearch records now cite the record's own person instead of the head of household.
+* Census, marriage, birth, death and other record events pre-fill the search with the event type, year range and place.
+* FamilySearch records without a citation no longer drop the person fields.
+
++---------+
 | 2.6.1   |
 +---------+
 
