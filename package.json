@@ -4,7 +4,8 @@
     "description": "RecordSeek browser extensions. Turn the page you are on into a source citation.",
     "scripts": {
         "build": "node scripts/build.js",
-        "test": "node scripts/build.js"
+        "test": "node scripts/build.js",
+        "safari:sync": "node scripts/build.js safari && rsync -a --delete tmp/dev/safari/ \"safari-app/RecordSeek/RecordSeek Extension/Resources/\""
     },
     "author": "IronManRust",
     "license": "ISC",

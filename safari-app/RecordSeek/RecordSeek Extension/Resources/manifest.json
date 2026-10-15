@@ -1,0 +1,63 @@
+{
+    "manifest_version": 3,
+    "name": "__MSG_extName__",
+    "description": "__MSG_extDescription__",
+    "author": "Dovy Paukstys",
+    "version": "2.6.1",
+    "homepage_url": "https://recordseek.com",
+    "default_locale": "en",
+    "icons": {
+        "16": "img/icon-16.png",
+        "32": "img/icon-32.png",
+        "48": "img/icon-48.png",
+        "128": "img/icon-128.png"
+    },
+    "action": {
+        "default_icon": {
+            "16": "img/icon-16.png",
+            "32": "img/icon-32.png",
+            "48": "img/icon-48.png",
+            "128": "img/icon-128.png"
+        },
+        "default_title": "__MSG_menuAction__"
+    },
+    "background": {
+        "scripts": [
+            "js/background.js"
+        ],
+        "service_worker": "js/background.js"
+    },
+    "permissions": [
+        "activeTab",
+        "contextMenus",
+        "cookies",
+        "storage",
+        "scripting"
+    ],
+    "host_permissions": [
+        "https://recordseek.com/*",
+        "https://*.recordseek.com/*",
+        "https://*.familysearch.org/*"
+    ],
+    "options_ui": {
+        "page": "html/options.html"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "https://recordseek.com/*",
+                "https://*.recordseek.com/*"
+            ],
+            "js": [
+                "js/browser.js",
+                "lib/genscrape.js",
+                "js/content.js"
+            ]
+        }
+    ],
+    "browser_specific_settings": {
+        "safari": {
+            "strict_min_version": "16"
+        }
+    }
+}
