@@ -80,24 +80,66 @@ function gx_fact(person, factType, field) {
   return '';
 }
 
+// The record's own event (FamilySearch marks it primary) -> search event type.
+var GX_EVENT_TYPES = {
+  Birth: 'birthLike', Christening: 'birthLike', Baptism: 'birthLike',
+  Death: 'deathLike', Burial: 'deathLike', Cremation: 'deathLike',
+  Marriage: 'marriageLike', MarriageBanns: 'marriageLike', MarriageLicense: 'marriageLike', MarriageContract: 'marriageLike',
+  Census: 'residence', Residence: 'residence'
+};
+
+// Event type, year range and place from the main person's primary fact.
+function gx_primary_event(out, person) {
+  var facts = (person && person.facts) || [];
+  for (var i = 0; i < facts.length; i++) {
+    var f = facts[i], type = GX_EVENT_TYPES[gx_short(f.type)];
+    if (f.primary === true && type) {
+      var years = ((f.date && f.date.original) || '').match(/\b\d{4}\b/g) || [];
+      out.eventType = type;
+      out.eventDateFrom = years[0] || '';
+      out.eventDateTo = years[years.length - 1] || '';
+      out.eventPlace = (f.place && f.place.original) || '';
+      return;
+    }
+  }
+}
+
 function gx_set_relative(out, prefix, person) {
   if (!person) return;
   out[prefix + 'GivenName'] = gx_name_part(person, 'Given');
   out[prefix + 'Surname'] = gx_name_part(person, 'Surname');
 }
 
+// The main person: principal=true, else persons[0].
+function gx_main_person(data) {
+  var persons = (data && data.persons) || [];
+  for (var i = 0; i < persons.length; i++) {
+    if (persons[i].principal === true) return persons[i];
+  }
+  return persons[0];
+}
+
+// The record's own source: the document's description, else the first titled
+// source the main person cites, else the first source description.
+function gx_main_source(data, main) {
+  var sources = (data && data.sourceDescriptions) || [];
+  var refs = [data && data.description];
+  var cited = (main && main.sources) || [];
+  for (var i = 0; i < cited.length; i++) refs.push(cited[i] && cited[i].description);
+  for (i = 0; i < refs.length; i++) {
+    if (typeof refs[i] !== 'string') continue;
+    var id = refs[i].replace(/^#/, '');
+    for (var j = 0; j < sources.length; j++) {
+      if (sources[j].id === id && sources[j].titles && sources[j].titles.length) return sources[j];
+    }
+  }
+  return sources[0];
+}
+
 // Map the primary person (principal=true, else persons[0]) and close relatives.
 function gx_person_params(data) {
   var out = {};
-  var persons = data.persons || [];
-  var main = null, i;
-  for (i = 0; i < persons.length; i++) {
-    if (persons[i].principal === true) {
-      main = persons[i];
-      break;
-    }
-  }
-  main = main || persons[0];
+  var main = gx_main_person(data), i;
   if (!main) return out;
   out.givenName = gx_name_part(main, 'Given');
   out.surname = gx_name_part(main, 'Surname');
@@ -106,6 +148,7 @@ function gx_person_params(data) {
   out.birthPlace = gx_fact(main, 'Birth', 'place');
   out.deathDate = gx_fact(main, 'Death', 'date');
   out.deathPlace = gx_fact(main, 'Death', 'place');
+  gx_primary_event(out, main);
   var rels = data.relationships || [];
   var mainRef = '#' + main.id;
   for (i = 0; i < rels.length; i++) {
@@ -153,12 +196,15 @@ function RecordSeek() {
   genscrape().on('data', function (data) {
     try {
       debug(data);
-      newData['title'] = data.sourceDescriptions[0].titles[0].value;
-      newData['citation'] = data.sourceDescriptions[0].citations[0].value;
-      newData['url'] = data.sourceDescriptions[0].about;
+      var main = gx_main_person(data);
+      var source = gx_main_source(data, main);
+      // Read each field on its own: FamilySearch records have no citation.
+      try { newData['title'] = source.titles[0].value; } catch (e) {}
+      try { newData['citation'] = source.citations[0].value; } catch (e) {}
+      try { newData['url'] = source.about; } catch (e) {}
       newData['tags'] = [];
       var person = gx_person_params(data);
-      var facts = (data.persons[0].facts || []);
+      var facts = (main && main.facts) || [];
       for (var i = 0; i < facts.length; i++) {
         var fact_type = gx_short(facts[i].type);
         if (fact_type && newData['tags'].indexOf(fact_type) == -1) {
