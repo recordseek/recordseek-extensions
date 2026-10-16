@@ -1,5 +1,5 @@
 /*! genscrape v1.6.1 (rootsdev/genscrape@316cccd4703c437b727a69c6f5c597b102e529f0) | MIT (c) Justin York | https://github.com/rootsdev/genscrape
- * Patched: innerHTML writes on detached nodes replaced with DOMParser (inert parsing); AMD detection disabled so a page-level define() cannot capture dependencies.
+ * Patched: scraper exceptions emit 'error'; Find a Grave relative/name parsing for the 2024+ layout; innerHTML writes on detached nodes replaced with DOMParser (inert parsing); AMD detection disabled so a page-level define() cannot capture dependencies.
  * Unminified build: npm install --omit=dev && npx esbuild@0.24.0 src/main.js --bundle --format=iife --global-name=genscrape --platform=browser --target=es2017 --legal-comments=inline --define:define=undefined */
 var genscrape = (() => {
   var __getOwnPropNames = Object.getOwnPropertyNames;
@@ -9125,7 +9125,11 @@ var genscrape = (() => {
       function getName() {
         var h1 = document.getElementById("bio-name");
         if (h1) {
-          var nameText = h1.textContent.trim();
+          var nameText = Array.from(h1.childNodes).filter(function(node) {
+            return node.nodeType === 3;
+          }).map(function(node) {
+            return node.textContent;
+          }).join(" ").replace(/\s+/g, " ").trim() || h1.textContent.trim();
           var suffix, parts = nameText.split(",");
           if (parts.length > 1) {
             suffix = parts[1];
@@ -9215,15 +9219,19 @@ var genscrape = (() => {
             var labelText = label.textContent;
             var list = label.nextElementSibling;
             if (list) {
-              groups[labelText.toLowerCase()] = Array.from(list.querySelectorAll("li")).map(processRelative);
+              groups[labelText.toLowerCase()] = Array.from(list.querySelectorAll("li")).map(processRelative).filter(Boolean);
             }
           });
           return groups;
         }, {});
       }
       function processRelative(item) {
-        var name = item.querySelector("#familyNameLabel").textContent.replace("*", "").trim();
-        var url = item.querySelector("a").href;
+        var $name = item.querySelector("#familyNameLabel") || item.querySelector('[itemprop="name"]'), $link = item.querySelector("a");
+        if (!$name || !$link) {
+          return null;
+        }
+        var name = $name.textContent.replace("*", "").trim();
+        var url = $link.href;
         var birthLabel = item.querySelector("#familyBirthLabel");
         var deathLabel = item.querySelector("#familyDeathLabel");
         return GedcomX.Person().addSimpleName(name).setId(getMemorialId(url)).setIdentifiers({
@@ -15691,7 +15699,12 @@ var genscrape = (() => {
             if (regex.test(thisUrl)) {
               debug("match");
               setTimeout(function() {
-                scraper.scraper(emitter);
+                try {
+                  scraper.scraper(emitter);
+                } catch (e) {
+                  debug("scraper failed", e);
+                  emitter.emit("error", e);
+                }
               });
               match = true;
             }

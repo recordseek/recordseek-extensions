@@ -4,7 +4,7 @@
     "description": "Convert any website into a source citation, with virtually no effort.",
     "author": "Dovy Paukstys",
     "homepage": "https://recordseek.com",
-    "version": "2.6.3",
+    "version": "2.6.4",
     "vendor": {
         "chrome": {
             "package-id": "simplerain.recordseek"

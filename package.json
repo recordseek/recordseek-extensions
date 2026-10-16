@@ -1,6 +1,6 @@
 {
     "name": "recordseek-browser-extensions",
-    "version": "2.6.3",
+    "version": "2.6.4",
     "description": "RecordSeek browser extensions. Turn the page you are on into a source citation.",
     "scripts": {
         "build": "node scripts/build.js",

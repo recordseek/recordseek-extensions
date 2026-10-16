@@ -210,7 +210,24 @@ function RecordSeek() {
     'ev': app.getVersion()
   };
 
-  genscrape().on('data', function (data) {
+  // Open the share page exactly once. A scraper that throws or never answers
+  // must not leave the click doing nothing, so a timer opens it without data.
+  var opened = false;
+  function open_once() {
+    if (opened) return;
+    opened = true;
+    open_tab(newData);
+  }
+  setTimeout(open_once, 3000);
+
+  var emitter;
+  try {
+    emitter = genscrape();
+  } catch (err) {
+    open_once();
+    return;
+  }
+  emitter.on('data', function (data) {
     try {
       debug(data);
       var main = gx_main_person(data);
@@ -237,16 +254,16 @@ function RecordSeek() {
     } catch (err) {
     }
     debug('genscrapeData');
-    open_tab(newData);
+    open_once();
   }).on('noMatch', function () {
     debug('noMatch');
-    open_tab(newData);
+    open_once();
   }).on('noData', function () {
     debug('noData');
-    open_tab(newData);
+    open_once();
   }).on('error', function () {
     debug('error');
-    open_tab(newData);
+    open_once();
   });
 }
 
